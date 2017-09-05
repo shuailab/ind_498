@@ -5,13 +5,12 @@ layout: default
 <!-- Course Description -->
 <div class="home">
 
-  <h1 class="page-heading">Goal</h1>
+  <h1 class="page-heading">Textbook</h1>
 
   <!-- <ul class="post-list">
     {% for post in site.posts %}
       <li>
         <span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span>
-
         <h2>
           <a class="post-link" href="{{ post.url | prepend: site.baseurl }}">{{ post.title }}</a>
         </h2>
@@ -20,7 +19,9 @@ layout: default
   </ul>
  -->
   <!-- <p class="rss-subscribe">subscribe <a href="{{ "/feed.xml" | prepend: site.baseurl }}">via RSS</a></p> -->
-  The Professional Practice seminar series takes place every autumn quarter and features talks by ISE alumni and industry partners. These seminars are designed to provide undergraduate students with insights that will help them prepare for the working world. Videos of the lectures are made available on the website.
+  <p> The textbook can be downloaded <td><a href="./resource/slides/Book_draft.pdf">here (PDF)</a></td>. </p>
+
+  <p> Not to play devil’s advocate, this book is named as analytics of small data for a reason. It doesn’t mean that the methods introduced in this book could only be applied to small datasets. Rather, it is the approach of this book to introduce analytics methods through exemplary datasets as small as possible, small enough that we could grasp with perception or intuition, whatever readily accessible to us. Then, we illustrate what questions we could ask and what types of models we can build based on these small datasets. In this way, we hope to connect perceivable intuition with abstract formulations. We hope this endeavor is achieved by this book. </p>
 
   <br />
   <br />
@@ -32,7 +33,7 @@ layout: default
 
   <h1 class="page-heading">Syllabus</h1>
 
-  The 2017 lineup is to be announced. In the meantime, watch the 2016 or 2015 session video recordings.
+  The Syllabus could be found <td><a href="./resource/slides/Syllabus.pdf">here (PDF)</a></td>
 
   <br />
   <br />
@@ -42,34 +43,88 @@ layout: default
 <!-- Course Schedule -->
 <div class="home">
 
-  <h1 class="page-heading">Course notes, code, data, and video lectures</h1>
+  <h1 class="page-heading">Course notes, data, and codes</h1>
 
   <table style="width: 800px;" border="1">
     <tbody>
       <tr>
-        <th align="left">lecture</th>
-        <th align="left">content</th>
-        <th align="left">PDF</th>
-        <th align="left">slides</th>
-        <th align="left">R</th>
-        <th align="left">HW</th>
+        <th align="left">Lecture</th>
+        <th align="left">Content</th>
+        <th align="left">Book Chapter</th>
+        <th align="left">R for regression</th>
+        <th align="left">R for tree</th>
       </tr>
-      <tr>
-        <td>00</td>
-        <td>Introduction</td>
-        <td><a href="./resource/slides/sample.pdf">pdf</a></td>
-        <td><a href="./resource/slides/sample.pdf">slides</a></td>
-        <td><a href="./resource/r/sample.pdf">r code</a></td>
-        <td><a href="./resource/solutions/sample.pdf">homeword solutions</a></td>
-      </tr>
+
       <tr>
         <td>01</td>
-        <td>Sencond Chapter</td>
-        <td></td>
-        <td></td>
-        <td></td>
-        <td></td>
+        <td>Introduction: linear regression and decision tree</td>
+        <td><a href="./resource/slides/Chapter1.pdf">pdf</a></td>
+        <td><a href="./resource/r/Chapter_linear_regression.html">r code</a></td>
+        <td><a href="./resource/r/Chapter_decision_tree.html">r code</a></td>
       </tr>
+
+      <tr>
+        <td>02</td>
+        <td>Logistic regression</td>
+        <td><a href="./resource/slides/Chapter2.pdf">pdf</a></td>
+        <td><a href="./resource/r/Chapter_logistic_regression.html">r code</a></td>
+      </tr>
+
+      <tr>
+        <td>03</td>
+        <td>Bootstrap and random forest</td>
+        <td><a href="./resource/slides/Chapter3.pdf">pdf</a></td>
+        <td><a href="./resource/r/Chapter_Bootstrap.html">r code</a></td>
+        <td><a href="./resource/r/chapter_RF.html">r code</a></td>
+      </tr>
+
+      <tr>
+        <td>04</td>
+        <td>Cross-validation and OOB</td>
+        <td><a href="./resource/slides/Chapter4.pdf">pdf</a></td>
+        <td><a href="./resource/r/chapter_cross_validation.html">r code</a></td>
+        <td><a href="./resource/r/Chapter_RF_OOB.html">r code</a></td>
+      </tr>
+
+      <tr>
+        <td>05</td>
+        <td>Residuals analysis and clustering</td>
+        <td><a href="./resource/slides/Chapter5.pdf">pdf</a></td>
+        <td><a href="./resource/r/chapter_residual_analysis.html">r code</a></td>
+        <td><a href="./resource/r/Chapter_diagnosis.html">r code</a></td>
+      </tr>
+
+      <tr>
+        <td>06</td>
+        <td>Support vector machine (SVM) and ensemble learning</td>
+        <td><a href="./resource/slides/Chapter6.pdf">pdf</a></td>
+        <td><a href="./resource/r/chapter_SVM.html">r code</a></td>
+        <td><a href="./resource/r/Chapter_ensemble_learning.html">r code</a></td>
+      </tr>
+
+      <tr>
+        <td>07</td>
+        <td>LASSO and principal component analysis (PCA)</td>
+        <td><a href="./resource/slides/Chapter7.pdf">pdf</a></td>
+        <td><a href="./resource/r/chapter_lasso_pca.html">r code</a></td>
+        <td><a href="./resource/r/Chapter_dimension_reduction.html">r code</a></td>
+      </tr>
+
+      <tr>
+        <td>08</td>
+        <td>Model extension and stacking</td>
+        <td><a href="./resource/slides/Chapter8.pdf">pdf</a></td>
+        <td><a href="./resource/r/chapter_kernel_regression.html">r code</a></td>
+        <td><a href="./resource/r/Chapter_system_monitoring.html">r code</a></td>
+      </tr>
+
+      <tr>
+        <td>09</td>
+        <td>inTrees</td>
+        <td><a href="./resource/slides/Chapter9.pdf">pdf</a></td>
+        <td><a href="./resource/r/Chapter_intrees.html">r code</a></td>
+      </tr>
+
       </tbody>
     </table>
 
