@@ -14,9 +14,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 #### Example: Alzheimer's Disease
 # filename
-setwd("C:/Users/shuai/Google Drive/Shuai/Paper/Working/2017 Analytics Book/analytics book/data/ADNI")
-AD <- read.csv('../Data/ADNI_baseline.csv', header = TRUE)
-AD$ID = c(1:dim(AD)[1])
+
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
 str(AD)
 ```
 
