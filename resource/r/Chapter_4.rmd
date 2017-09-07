@@ -1,0 +1,228 @@
+---
+title: "Chapter 4"
+author: "shuai"
+date: "August 25, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+####Analytics Class####
+####Chapter 4####
+
+```{r}
+#### Dataset of Alzheimer's Disease 
+#### Objective: prediction of diagnosis 
+# filename
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+str(AD)
+```
+
+```{r}
+# Description of variables
+# ID  ID of the subjects
+# DX_bl Diagnosis (0: normal; 1: patient)
+# Age Age
+# PTGENDER Gender
+# PTEDUCAT Years of education
+# FDG Average FDG-PET
+# AV45 Average AV45 SUVR
+# HippoNV The normalized hippocampus volume
+# e2_1 Apolipoprotein E4 polymorphism
+# e4_1 Apolipoprotein E4 polymorphism
+# rs3818361 CR1 gene rs3818361 polymorphism
+# rs744373 BIN1 gene rs744373 polymorphism
+# rs11136000 Clusterin CLU gene rs11136000 polymorphism
+# rs610932 MS4A6A gene rs610932 polymorphism
+# rs3851179 PICALM gene rs3851179 polymorphism
+# rs3764650 ABCA7 gene rs3764650 polymorphism
+# rs3865444 CD33 gene rs3865444 polymorphism
+# MMSCORE Mini-mental state examination (outcome variable)
+# TOTAL13 Alzheimer's Disease Assessment Scale (outcome variable)
+```
+
+
+```{r}
+require(MASS)
+fit <- fitdistr(AD$HippoNV, densfun="normal")  
+fit
+hist(AD$HippoNV, pch=20, breaks=25, prob=TRUE, main="")
+curve(dnorm(x, fit$estimate[1], fit$estimate[2]), col="red", lwd=2, add=T)
+```
+
+
+```{r}
+# draw R bootstrap replicates
+R <- 10000
+# init location for bootstrap samples
+bs_mean <- rep(NA, R)
+# draw R bootstrap resamples and obtain the estimates
+for (i in 1:R) {
+  resam1 <- sample(AD$HippoNV, dim(AD)[1], replace = TRUE)
+  fit <- fitdistr(resam1 , densfun="normal")  
+  bs_mean[i] <- fit$estimate[1]
+}
+
+# sort the mean estimates to obtain bootstrap CI
+bs_mean.sorted <- sort(bs_mean)
+# 0.025th and 0.975th quantile gives equal-tail bootstrap CI
+CI.bs <- c(bs_mean.sorted[round(0.025*R)], bs_mean.sorted[round(0.975*R+1)])
+CI.bs
+## Plot the bootstrap distribution with CI
+# First put data in data.frame for ggplot()
+dat.bs_mean <- data.frame(bs_mean)
+```
+
+
+```{r}
+library(ggplot2)
+p <- ggplot(dat.bs_mean, aes(x = bs_mean))
+p <- p + geom_histogram(aes(y=..density..))
+p <- p + geom_density(alpha=0.1, fill="white")
+p <- p + geom_rug()
+# vertical line at CI
+p <- p + geom_vline(xintercept=CI.bs[1], colour="blue", linetype="longdash")
+p <- p + geom_vline(xintercept=CI.bs[2], colour="blue", linetype="longdash")
+p <- p + labs(title = "Bootstrap distribution of mean estimate of HippoNV")
+print(p)
+```
+
+
+```{r}
+
+tempData <- data.frame(AD$HippoNV,AD$DX_bl)
+names(tempData) = c("HippoNV","DX_bl")
+tempData$DX_bl[which(tempData$DX_bl==0)] <- c("Normal")
+tempData$DX_bl[which(tempData$DX_bl==1)] <- c("Diseased")
+
+p <- ggplot(tempData,aes(x = HippoNV, colour=DX_bl))
+p <- p +  geom_histogram(aes(y = ..count.., fill=DX_bl), alpha=0.5,position="identity") 
+print(p)
+```
+
+
+```{r}
+
+# draw R bootstrap replicates
+R <- 10000
+# init location for bootstrap samples
+bs0_mean <- rep(NA, R)
+bs1_mean <- rep(NA, R)
+# draw R bootstrap resamples and obtain the estimates
+for (i in 1:R) {
+  resam0 <- sample(tempData$HippoNV[which(tempData$DX_bl=="Normal")], 
+                   length(tempData$HippoNV[which(tempData$DX_bl=="Normal")]), 
+                   replace = TRUE)
+  fit0 <- fitdistr(resam0 , densfun="normal")  
+  bs0_mean[i] <- fit0$estimate[1]
+  resam1 <- sample(tempData$HippoNV[which(tempData$DX_bl=="Diseased")], 
+                   length(tempData$HippoNV[which(tempData$DX_bl=="Diseased")]),
+                   replace = TRUE)
+  fit1 <- fitdistr(resam1 , densfun="normal") 
+  bs1_mean[i] <- fit1$estimate[1]
+}
+
+bs_meanDiff <- bs0_mean - bs1_mean
+
+# sort the mean estimates to obtain bootstrap CI
+bs_meanDiff.sorted <- sort(bs_meanDiff)
+# 0.025th and 0.975th quantile gives equal-tail bootstrap CI
+CI.bs <- c(bs_meanDiff.sorted[round(0.025*R)], bs_meanDiff.sorted[round(0.975*R+1)])
+CI.bs
+## Plot the bootstrap distribution with CI
+# First put data in data.frame for ggplot()
+dat.bs_meanDiff <- data.frame(bs_meanDiff)
+
+library(ggplot2)
+p <- ggplot(dat.bs_meanDiff, aes(x = bs_meanDiff))
+p <- p + geom_histogram(aes(y=..density..))
+p <- p + geom_density(alpha=0.1, fill="white")
+p <- p + geom_rug()
+# vertical line at CI
+p <- p + geom_vline(xintercept=CI.bs[1], colour="blue", linetype="longdash")
+p <- p + geom_vline(xintercept=CI.bs[2], colour="blue", linetype="longdash")
+p <- p + labs(title = "Bootstrap distribution of the estimated mean difference of HippoNV between normal and diseased")
+print(p)
+
+```
+
+
+```{r}
+# Use Bootstrap for multiple regression model
+tempData <- data.frame(AD$MMSCORE,AD$AGE, AD$PTGENDER, AD$PTEDUCAT)
+names(tempData) <- c("MMSCORE","AGE","PTGENDER","PTEDUCAT")
+lm.AD_demo <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = tempData)
+summary(lm.AD_demo)
+lm.AD_demo$coefficients
+```
+
+
+```{r}
+
+# draw R bootstrap replicates
+R <- 10000
+# init location for bootstrap samples
+bs_lm.AD_demo <- matrix(NA, nrow = R, ncol = length(lm.AD_demo$coefficients))
+# draw R bootstrap resamples and obtain the estimates
+for (i in 1:R) {
+  resam_ID <- sample(c(1:dim(tempData)[1]), dim(tempData)[1], replace = TRUE)
+  resam_Data <- tempData[resam_ID,]
+  bs.lm.AD_demo <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = resam_Data)
+  bs_lm.AD_demo[i,] <- bs.lm.AD_demo$coefficients
+}
+
+
+bs.AGE <- bs_lm.AD_demo[,2]
+# sort the mean estimates of AGE to obtain bootstrap CI
+bs.AGE.sorted <- sort(bs.AGE)
+
+# 0.025th and 0.975th quantile gives equal-tail bootstrap CI
+CI.bs <- c(bs.AGE.sorted[round(0.025*R)], bs.AGE.sorted[round(0.975*R+1)])
+CI.bs
+## Plot the bootstrap distribution with CI
+# First put data in data.frame for ggplot()
+dat.bs.AGE <- data.frame(bs.AGE.sorted)
+
+library(ggplot2)
+p <- ggplot(dat.bs.AGE, aes(x = bs.AGE))
+p <- p + geom_histogram(aes(y=..density..))
+p <- p + geom_density(alpha=0.1, fill="white")
+p <- p + geom_rug()
+# vertical line at CI
+p <- p + geom_vline(xintercept=CI.bs[1], colour="blue", linetype="longdash")
+p <- p + geom_vline(xintercept=CI.bs[2], colour="blue", linetype="longdash")
+p <- p + labs(title = "Bootstrap distribution of the estimated regression parameter of AGE")
+print(p)
+
+```
+
+
+```{r}
+
+bs.PTEDUCAT <- bs_lm.AD_demo[,4]
+# sort the mean estimates of PTEDUCAT to obtain bootstrap CI
+bs.PTEDUCAT.sorted <- sort(bs.PTEDUCAT)
+
+# 0.025th and 0.975th quantile gives equal-tail bootstrap CI
+CI.bs <- c(bs.PTEDUCAT.sorted[round(0.025*R)], bs.PTEDUCAT.sorted[round(0.975*R+1)])
+CI.bs
+## Plot the bootstrap distribution with CI
+# First put data in data.frame for ggplot()
+dat.bs.PTEDUCAT <- data.frame(bs.PTEDUCAT.sorted)
+
+library(ggplot2)
+p <- ggplot(dat.bs.PTEDUCAT, aes(x = bs.PTEDUCAT))
+p <- p + geom_histogram(aes(y=..density..))
+p <- p + geom_density(alpha=0.1, fill="white")
+p <- p + geom_rug()
+# vertical line at CI
+p <- p + geom_vline(xintercept=CI.bs[1], colour="blue", linetype="longdash")
+p <- p + geom_vline(xintercept=CI.bs[2], colour="blue", linetype="longdash")
+p <- p + labs(title = "Bootstrap distribution of the estimated regression parameter of PTEDUCAT")
+print(p)
+```

@@ -124,15 +124,16 @@ $(document).ready(function () {
 <pre class="r"><code>library(dplyr)
 library(tidyr)
 library(ggplot2)
-require(randomForest)
-require(gbm)
-require(rpart)
+library(randomForest)
+library(RCurl)
+library(gbm)
+library(rpart)
 set.seed(1)
 
 theme_set(theme_gray(base_size = 15))
 
-path &lt;- &quot;../../data/ADNI/ADNI_baseline2.csv&quot;
-data &lt;- read.csv(path, header = TRUE)
+data &lt;- read.csv(text = getURL(&quot;https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv&quot;))
+
 rm_indx &lt;- which(colnames(data) %in% c(&quot;ID&quot;, &quot;TOTAL13&quot;, &quot;MMSCORE&quot;))
 data &lt;- data[, -rm_indx]
 data$DX_bl &lt;- as.factor(data$DX_bl)

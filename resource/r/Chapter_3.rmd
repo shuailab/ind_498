@@ -1,0 +1,230 @@
+---
+title: "Chapter 3"
+author: "shuai"
+date: "August 25, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+####Chapter 3####
+
+```{r}
+#### Dataset of Alzheimer's Disease 
+#### Objective: prediction of diagnosis 
+# filename
+#setwd("C:/Users/shuai/Google Drive/Shuai/Paper/Working/2017 Analytics Book/analytics book/data/ADNI")
+#AD <- read.csv('ADNI_baseline2.csv', header = TRUE)
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+str(AD)
+```
+
+```{r}
+# write.csv(AD, file = "ADNI_baseline2.csv")
+# Description of variables
+# ID  ID of the subjects
+# DX_bl Diagnosis (0: normal; 1: patient)
+# Age Age
+# PTGENDER Gender
+# PTEDUCAT Years of education
+# FDG Average FDG-PET
+# AV45 Average AV45 SUVR
+# HippoNV The normalized hippocampus volume
+# e2_1 Apolipoprotein E4 polymorphism
+# e4_1 Apolipoprotein E4 polymorphism
+# rs3818361 CR1 gene rs3818361 polymorphism
+# rs744373 BIN1 gene rs744373 polymorphism
+# rs11136000 Clusterin CLU gene rs11136000 polymorphism
+# rs610932 MS4A6A gene rs610932 polymorphism
+# rs3851179 PICALM gene rs3851179 polymorphism
+# rs3764650 ABCA7 gene rs3764650 polymorphism
+# rs3865444 CD33 gene rs3865444 polymorphism
+# MMSCORE Mini-mental state examination (outcome variable)
+# TOTAL13 Alzheimer's Disease Assessment Scale (outcome variable)
+```
+
+```{r}
+# Generate 2-way contigency table
+xtabs(~DX_bl + PTGENDER, data = AD)
+```
+
+```{r}
+# Create the frequency table in accordance of categorization of HippoNV
+temp = quantile(AD$HippoNV,seq(from = 0.05, to = 0.95, by = 0.05))
+AD$HippoNV.category <- cut(AD$HippoNV, breaks=c(-Inf, temp, Inf))
+tempData <- data.frame(xtabs(~DX_bl + HippoNV.category, data = AD))
+tempData <- tempData[seq(from = 2, to = 2*length(unique(AD$HippoNV.category)), by = 2),]
+summary(xtabs(~DX_bl + HippoNV.category, data = AD))
+tempData$Total <- colSums(as.matrix(xtabs(~DX_bl + HippoNV.category, data = AD)))
+tempData$p.hat <- 1 - tempData$Freq/tempData$Total
+tempData$HippoNV.category = as.numeric(tempData$HippoNV.category)
+str(tempData)
+```
+
+
+```{r}
+# Draw the scatterplot of HippoNV.category versus the probability of normal
+library(ggplot2)
+p <- ggplot(tempData, aes(x = HippoNV.category, y = p.hat))
+p <- p + geom_point(size=3)
+p <- p + geom_smooth(method = "loess")
+p <- p + labs(title ="Empirically observed probability of normal", xlab = "HippoNV")
+print(p)
+```
+
+
+
+```{r}
+# Fit a logistic regression model with FDG 
+logit.AD <- glm(DX_bl ~ FDG, data = AD, family = "binomial")
+summary(logit.AD)
+```
+
+
+```{r}
+## CIs of the regression parameters using profiled log-likelihood
+confint(logit.AD)
+```
+
+
+```{r}
+# Extract the covariance matrix of the regression parameters
+Sigma = vcov(logit.AD)
+```
+
+
+```{r}
+## wald test for the regression coefficients
+library(aod)
+wald.test(b = coef(logit.AD), Sigma = vcov(logit.AD), Terms = 2)
+```
+
+
+
+```{r}
+# To predict on a given dataset
+AD.pred <- AD[sample(1:dim(AD)[1], 200),]
+# predict() uses all the temp values in dataset, including appended values
+pred <- predict(logit.AD, AD.pred, type = "link", se.fit = TRUE)
+AD.pred$fit    <- pred$fit
+AD.pred$se.fit <- pred$se.fit
+# CI for fitted values
+AD.pred <- within(AD.pred, {
+  # added "fitted" to make predictions at appended temp values
+  fitted    = exp(fit) / (1 + exp(fit))
+  fit.lower = exp(fit - 1.96 * se.fit) / (1 + exp(fit - 1.96 * se.fit))
+  fit.upper = exp(fit + 1.96 * se.fit) / (1 + exp(fit + 1.96 * se.fit))
+})
+```
+
+
+
+```{r}
+# visualize the prediction
+library(ggplot2)
+newData <- AD.pred[order(AD.pred$FDG),]
+p <- ggplot(newData, aes(x = FDG, y = DX_bl))
+# predicted curve and point-wise 95% CI
+p <- p + geom_ribbon(aes(x = FDG, ymin = fit.lower, ymax = fit.upper), alpha = 0.2)
+p <- p + geom_line(aes(x = FDG, y = fitted), colour="red")
+# fitted values
+p <- p + geom_point(aes(y = fitted), size=2, colour="red")
+# observed values
+p <- p + geom_point(size = 2)
+p <- p + ylab("Probability")
+p <- p + labs(title = "Observed and predicted probability of disease")
+print(p)
+```
+
+
+
+
+```{r}
+# install.packages("reshape2")
+require(reshape2)
+AD.long <- melt(AD[,c(1,2,4,5,6,7,19)], id.vars = c("ID", "DX_bl"))
+# Plot the data using ggplot
+require(ggplot2)
+p <- ggplot(AD.long, aes(x = factor(DX_bl), y = value))
+# boxplot, size=.75 to stand out behind CI
+p <- p + geom_boxplot(size = 0.75, alpha = 0.5)
+# points for observed data
+p <- p + geom_point(position = position_jitter(w = 0.05, h = 0), alpha = 0.1)
+# diamond at mean for each group
+p <- p + stat_summary(fun.y = mean, geom = "point", shape = 18, size = 6,
+                      alpha = 0.75, colour = "red")
+# confidence limits based on normal distribution
+p <- p + stat_summary(fun.data = "mean_cl_normal", geom = "errorbar",
+                      width = .2, alpha = 0.8)
+p <- p + facet_wrap( ~ variable, scales = "free_y", ncol = 3)
+p <- p + labs(title = "Boxplots of variables by diagnosis (0 - normal; 1 - patient)")
+print(p)
+```
+
+
+
+```{r}
+# install.packages("vcd")
+require(vcd)
+mosaic(data = table(AD[,c(1,3,10)]), ~ ., shade=TRUE, legend=TRUE)
+mosaicplot(table(AD[,c(1,3,10)]), sort = c(3,1,2), color = T)
+```
+
+
+
+```{r}
+# Automatic selection of the model
+logit.AD.full <- glm(DX_bl ~ ., data = AD[,c(1:16)], family = "binomial")
+logit.AD.final <- step(logit.AD.full, direction="both", trace = 0)
+summary(logit.AD.final)
+```
+
+
+
+```{r}
+# Test residual deviance for lack-of-fit (if > 0.10, little-to-no lack-of-fit)
+dev.p.val <- 1 - pchisq(logit.AD.final$deviance, logit.AD.final$df.residual)
+dev.p.val
+```
+
+
+```{r}
+# coefficients and 95% CI
+cbind(coef = coef(logit.AD.final), confint(logit.AD.final))
+## odds ratios and 95% CI
+exp(cbind(OR = coef(logit.AD.final), confint(logit.AD.final)))
+```
+
+
+```{r}
+# evaluate how well the model fits the data
+# predicted probabilities
+Yhat <- fitted(logit.AD.final)
+# the observed events 
+YObs <- AD$DX_bl
+# calculate the correlation between the predicted and observed
+cor(Yhat,AD$DX_bl)
+# visualize the correlation
+tempData = cbind(Yhat,AD$DX_bl)
+require(ggplot2)
+qplot(factor(AD$DX_bl), Yhat, data = AD, 
+      geom=c("boxplot"), fill = factor(AD$DX_bl),title="Prediction versus Observed")
+```
+
+
+
+```{r}
+# install.packages("popbio")
+require(popbio)
+logi.hist.plot(AD$FDG, AD$DX_bl, boxp=FALSE, type="hist"
+               , rug=TRUE, col="gray", ylabel = "Probability", xlabel = "FDG")
+logi.hist.plot(AD$HippoNV, AD$DX_bl, boxp=FALSE, type="hist"
+               , rug=TRUE, col="gray", ylabel = "Probability", xlabel = "HippoNV")
+```

@@ -1,0 +1,333 @@
+---
+title: "Chapter 5"
+author: "shuai"
+date: "August 25, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+####Analytics Class####
+####Chapter 5####
+
+
+```{r}
+# Write a nice simulator to generate dataset with one predictor and one outcome
+# from a polynomial regression model
+seed <- rnorm(1)
+set.seed(seed)
+gen_data <- function(n, coef, v_noise) {
+  eps <- rnorm(n, 0, v_noise)
+  x <- sort(runif(n, 0, 100))
+  X <- cbind(1,ns(x, df = (length(coef) - 1)))
+  y <- as.numeric(X %*% coef + eps)
+  return(data.frame(x = x, y = y))
+}
+```
+
+
+```{r}
+# Fit the data using different models with different degrees of freedom (df)
+# install.packages("splines")
+require(splines)
+
+# Simulate one batch of data, and see how different model fits with df from 1 to 50
+
+n_train <- 100
+coef <- c(-0.68,0.82,-0.417,0.32,-0.68)
+v_noise <- 0.2
+n_df <- 20
+df <- 1:n_df
+tempData <- gen_data(n_train, coef, v_noise)
+
+x <- tempData[, "x"]
+y <- tempData[, "y"]
+fit <- apply(t(df), 2, function(degf) lm(y ~ ns(x, df = degf)))
+
+
+# Plot the data
+x <- tempData$x
+X <- cbind(1, ns(x, df = (length(coef) - 1)))
+y <- tempData$y
+plot(y ~ x, col = "gray", lwd = 2)
+lines(x, X %*% coef, lwd = 3, col = "black")
+lines(x, fitted(fit[[1]]), lwd = 3, col = "darkorange")
+lines(x, fitted(fit[[4]]), lwd = 3, col = "dodgerblue4")
+# lines(x, fitted(fit[[10]]), lwd = 3, col = "darkorange")
+lines(x, fitted(fit[[20]]), lwd = 3, col = "forestgreen")
+legend(x = "topleft", legend = c("True function", "Linear fit (df = 1)", "Best model (df = 4)", "Overfitted model (df = 15)",
+                                 "Overfitted model (df = 20)"), lwd = rep(3, 4), col = c("black", "darkorange", "dodgerblue4",
+                                                                                         "forestgreen"), text.width = 32, cex = 0.85)
+
+```
+
+
+```{r}
+
+# Generate test data from the same model
+n_test <- 50
+xy_test <- gen_data(n_test, coef, v_noise)
+
+# Compute the training and test errors for each model
+mse <- sapply(fit, function(obj) deviance(obj)/nobs(obj))
+pred <- mapply(function(obj, degf) predict(obj, data.frame(x = xy_test$x)), 
+                      fit, df)
+te <- sapply(as.list(data.frame(pred)), function(y_hat) mean((xy_test$y - y_hat)^2))
+
+
+# Plot the errors
+plot(df, mse, type = "l", lwd = 2, col = gray(0.4), ylab = "Prediction error", 
+     xlab = "The degrees of freedom (logged) of the model", ylim = c(0.9*min(mse), 1.1*max(mse)), log = "x")
+
+lines(df, te, lwd = 2, col = "orange3")
+
+points(df[1], mse[1], col = "palegreen3", pch = 17, cex = 1.5)
+points(df[1], te[1], col = "palegreen3", pch = 17, cex = 1.5)
+points(df[which.min(te)], mse[which.min(te)], col = "darkorange", pch = 16, 
+       cex = 1.5)
+points(df[which.min(te)], te[which.min(te)], col = "darkorange", pch = 16, 
+       cex = 1.5)
+points(df[15], mse[15], col = "steelblue", pch = 15, cex = 1.5)
+points(df[15], te[15], col = "steelblue", pch = 15, cex = 1.5)
+legend(x = "center", legend = c("Training error", "Test error"), lwd = rep(2, 2), 
+       col = c(gray(0.4), "orange3"), text.width = 0.3, cex = 1.2)
+```
+
+
+```{r}
+# Repeat the above experiments in 100 times
+n_rep <- 100
+n_train <- 50
+coef <- c(-0.68,0.82,-0.417,0.32,-0.68)
+v_noise <- 0.2
+n_df <- 20
+df <- 1:n_df
+xy <- res <- list()
+xy_test <- gen_data(n_test, coef, v_noise)
+for (i in 1:n_rep) {
+  xy[[i]] <- gen_data(n_train, coef, v_noise)
+  x <- xy[[i]][, "x"]
+  y <- xy[[i]][, "y"]
+  res[[i]] <- apply(t(df), 2, function(degf) lm(y ~ ns(x, df = degf)))
+}
+
+
+# Compute the training and test errors for each model
+pred <- list()
+mse <- te <- matrix(NA, nrow = n_df, ncol = n_rep)
+for (i in 1:n_rep) {
+  mse[, i] <- sapply(res[[i]], function(obj) deviance(obj)/nobs(obj))
+  pred[[i]] <- mapply(function(obj, degf) predict(obj, data.frame(x = xy_test$x)), 
+                      res[[i]], df)
+  te[, i] <- sapply(as.list(data.frame(pred[[i]])), function(y_hat) mean((xy_test$y - 
+                                                                            y_hat)^2))
+}
+
+# Compute the average training and test errors
+av_mse <- rowMeans(mse)
+av_te <- rowMeans(te)
+
+# Plot the errors
+plot(df, av_mse, type = "l", lwd = 2, col = gray(0.4), ylab = "Prediction error", 
+     xlab = "The degrees of freedom (logged) of the model", ylim = c(0.7*min(mse), 1.4*max(mse)), log = "x")
+for (i in 1:n_rep) {
+  lines(df, te[, i], col = "lightyellow2")
+}
+for (i in 1:n_rep) {
+  lines(df, mse[, i], col = gray(0.8))
+}
+lines(df, av_mse, lwd = 2, col = gray(0.4))
+lines(df, av_te, lwd = 2, col = "orange3")
+points(df[1], av_mse[1], col = "palegreen3", pch = 17, cex = 1.5)
+points(df[1], av_te[1], col = "palegreen3", pch = 17, cex = 1.5)
+points(df[which.min(av_te)], av_mse[which.min(av_te)], col = "darkorange", pch = 16, 
+       cex = 1.5)
+points(df[which.min(av_te)], av_te[which.min(av_te)], col = "darkorange", pch = 16, 
+       cex = 1.5)
+points(df[20], av_mse[20], col = "steelblue", pch = 15, cex = 1.5)
+points(df[20], av_te[20], col = "steelblue", pch = 15, cex = 1.5)
+legend(x = "center", legend = c("Training error", "Test error"), lwd = rep(2, 2), 
+       col = c(gray(0.4), "darkred"), text.width = 0.3, cex = 0.85)
+```
+
+
+```{r}
+# Cross-validation
+set.seed(seed)
+
+n_train <- 100
+xy <- gen_data(n_train, coef, v_noise)
+x <- xy$x
+y <- xy$y
+
+fitted_models <- apply(t(df), 2, function(degf) lm(y ~ ns(x, df = degf)))
+mse <- sapply(fitted_models, function(obj) deviance(obj)/nobs(obj))
+
+n_test <- 10000
+xy_test <- gen_data(n_test, coef, v_noise)
+pred <- mapply(function(obj, degf) predict(obj, data.frame(x = xy_test$x)), 
+               fitted_models, df)
+te <- sapply(as.list(data.frame(pred)), function(y_hat) mean((xy_test$y - y_hat)^2))
+
+n_folds <- 10
+folds_i <- sample(rep(1:n_folds, length.out = n_train))
+cv_tmp <- matrix(NA, nrow = n_folds, ncol = length(df))
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_xy <- xy[-test_i, ]
+  test_xy <- xy[test_i, ]
+  x <- train_xy$x
+  y <- train_xy$y
+  fitted_models <- apply(t(df), 2, function(degf) lm(y ~ ns(x, df = degf)))
+  x <- test_xy$x
+  y <- test_xy$y
+  pred <- mapply(function(obj, degf) predict(obj, data.frame(ns(x, df = degf))), 
+                 fitted_models, df)
+  cv_tmp[k, ] <- sapply(as.list(data.frame(pred)), function(y_hat) mean((y - 
+                                                                           y_hat)^2))
+}
+cv <- colMeans(cv_tmp)
+
+# install.packages("Hmisc")
+require(Hmisc)
+
+plot(df, mse, type = "l", lwd = 2, col = gray(0.4), ylab = "Prediction error", 
+     xlab = "The degrees of freedom (logged) of the model", main = paste0(n_folds, 
+                                                                                   "-fold Cross-Validation"), ylim = c(0.8*min(mse), 1.2*max(mse)), log = "x")
+lines(df, te, lwd = 2, col = "orange3", lty = 2)
+cv_sd <- apply(cv_tmp, 2, sd)/sqrt(n_folds)
+errbar(df, cv, cv + cv_sd, cv - cv_sd, add = TRUE, col = "steelblue2", pch = 19, 
+       lwd = 0.5)
+lines(df, cv, lwd = 2, col = "steelblue2")
+points(df, cv, col = "steelblue2", pch = 19)
+legend(x = "topright", legend = c("Training error", "Test error", "Cross-validation error"), 
+       lty = c(1, 2, 1), lwd = rep(2, 3), col = c(gray(0.4), "darkred", "steelblue2"), 
+       text.width = 0.4, cex = 0.85)
+```
+
+
+```{r}
+# The LOOC error
+require(splines)
+n_train <- 100
+xy <- gen_data(n_train, coef, v_noise)
+x <- xy$x
+y <- xy$y
+loocv_tmp <- matrix(NA, nrow = n_train, ncol = length(df))
+for (k in 1:n_train) {
+  train_xy <- xy[-k, ]
+  test_xy <- xy[k, ]
+  x <- train_xy$x
+  y <- train_xy$y
+  fitted_models <- apply(t(df), 2, function(degf) lm(y ~ ns(x, df = degf)))
+  pred <- mapply(function(obj, degf) predict(obj, data.frame(x = test_xy$x)),
+                 fitted_models, df)
+  loocv_tmp[k, ] <- (test_xy$y - pred)^2
+}
+loocv <- colMeans(loocv_tmp)
+
+plot(df, mse, type = "l", lwd = 2, col = gray(.4), ylab = "Prediction error",
+     xlab = "The degrees of freedom (logged) of the model",
+     main = "Leave-One-Out Cross-Validation", ylim = c(0.8*min(mse), 1.2*max(mse)), log = "x")
+lines(df, te, lwd = 2, col = "orange3", lty = 2)
+lines(df, cv, lwd = 2, col = "steelblue2", lty = 2)
+lines(df, loocv, lwd = 2, col = "darkorange")
+legend(x = "topright", legend = c("Training error","Test error", "10-fold CV error", "LOOCV error"),
+       lty = c(1, 2, 2,1), lwd = rep(2, 3), col = c(gray(.4),"orange3", "steelblue2", "darkorange"),
+       text.width = .3, cex = .85)
+
+```
+
+
+```{r}
+
+#### Dataset of Alzheimer's Disease 
+#### Objective: prediction of diagnosis 
+# filename
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+str(AD)
+# fit a model with demographics only
+lm.AD_demo <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = AD)
+summary(lm.AD_demo)
+```
+
+
+```{r}
+n_folds <- 10
+folds_i <- sample(rep(1:n_folds, length.out = dim(AD)[1]))
+cv_tmp <- matrix(NA, nrow = n_folds, 1)
+cv_err <- matrix(NA, nrow = 50*n_folds,2)
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k)
+  train_xy <- AD[-test_i, ]
+  test_xy <- AD[test_i, ]
+  y <- test_xy$MMSCORE
+  lm.AD_demo <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = train_xy)
+  pred <- predict(lm.AD_demo,test_xy)
+  cv_tmp[k] <- mean((y - pred )^2)
+  temp <- y - pred
+  cv_err[(1+((k-1)*50)):(k*50),1] = rep(k,50)
+  cv_err[(1+((k-1)*50)):(k*50),2] <- temp[1:50]
+}
+library(ggplot2)
+p <- ggplot(data.frame(cv_tmp),aes(x=factor(""),y=cv_tmp))+geom_boxplot()+ xlab("") ## box plot
+p <- p + labs(title="MSE of lm.AD_demo by 10-folder Cross Validation")
+print(p)
+```
+
+
+```{r}
+# Visualize the distributions of the prediction errors in the folders
+cv_err <- data.frame(cv_err)
+names(cv_err) = c("Folder","Error")
+ggplot(data = cv_err, aes(x = Folder, y = Error)) + 
+  geom_boxplot(aes(colour=factor(Folder)), fill=NA) + 
+  geom_point(aes(color = factor(Folder)))
+```
+
+
+```{r}
+# ROC and more performance metrics of logistic regression model
+# Load the AD dataset
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+str(AD)
+
+# Split the data into training and testing sets
+n = dim(AD)[1]
+n.train <- floor(0.8 * n)
+idx.train <- sample(n, n.train)
+AD.train <- AD[idx.train,]
+AD.test <- AD[-idx.train,]
+
+# Automatic selection of the model
+logit.AD.full <- glm(DX_bl ~ ., data = AD.train[,c(1:16)], family = "binomial")
+logit.AD.final <- step(logit.AD.full, direction="both", trace = 0)
+summary(logit.AD.final)
+```
+
+
+```{r}
+# install.packages("e1071")
+require(e1071)
+require(caret)
+# Prediction scores
+pred = predict(logit.AD.final, newdata=AD.test,type="response")
+confusionMatrix(data=factor(pred>0.5), factor(AD.test[,1]==1))
+
+# Generate the ROC curve using the testing data
+# Compute ROC and Precision-Recall curves
+require( 'ROCR')
+linear.roc.curve <- performance( prediction(pred, AD.test[,1]),
+                                 measure='tpr', x.measure='fpr' )
+plot(linear.roc.curve,  lwd = 2, col = "orange3", 
+     main = "Validation of the logistic model using testing data")
+```
+
+
+
+

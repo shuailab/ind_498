@@ -128,11 +128,12 @@ require(inTrees)
 require(ggplot2)
 require(randomForest)
 require(RRF)
+require(RCurl)
 set.seed(1)
 theme_set(theme_gray(base_size = 18))
 
-path &lt;- &quot;../../data/ADNI/ADNI_bl_hd.csv&quot;
-data &lt;- read.csv(path, header = TRUE)
+
+data &lt;- read.csv(text = getURL(&quot;https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD_hd.csv&quot;))
 data$AGE &lt;- as.factor(dicretizeVector(data$AGE, K = 2))
 target &lt;- data$AGE
 rm_indx &lt;- which(colnames(data) %in% c(&quot;AGE&quot;, &quot;ID&quot;, &quot;TOTAL13&quot;, &quot;MMSCORE&quot;))

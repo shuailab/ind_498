@@ -1,0 +1,98 @@
+---
+title: 'R-Lab: Random Forests Diagnosis'
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE, warning=FALSE, message=FALSE)
+```
+
+Variable importance scores. 
+
+```{r}
+library("RWeka")
+library("randomForest")
+library("RRF")
+library("inTrees")
+library("ggplot2")
+library(RCurl)
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+target_indx <- which( colnames(data) == "DX_bl" )
+rm_indx <-  which( colnames(data) %in% c("ID","DX_bl","TOTAL13","MMSCORE") ) 
+rf <- randomForest(data[,-rm_indx], as.factor(data[,target_indx]))
+imp <- as.data.frame(rf$importance)
+colnames(imp)[colnames(imp) == "MeanDecreaseGini"] <- "importance"
+imp <- imp[order(imp$importance,decreasing = FALSE),,drop=FALSE]
+imp$feature <- rownames(imp)
+imp$feature <- factor(imp$feature, levels = as.character( imp$feature ) )
+theme_set(theme_gray(base_size = 18))
+ggplot(data=imp, aes(x=feature,y=importance)) + geom_bar(stat="identity",aes(factor(feature)),fill="red" ) +
+  theme( axis.title.y=element_blank(), axis.text.y = element_text( hjust = 1, size = 15)) + coord_flip()
+
+```
+
+Partial dependence plot.
+
+```{r}
+randomForest::partialPlot(rf, data, HippoNV,"1")
+randomForest::partialPlot(rf, data, FDG,"1")
+
+```
+
+Extract rules from random forests. 
+
+```{r}
+treeList <- RF2List(rf)  # transform rf object to an inTrees' format
+exec <- extractRules(treeList,data[,-rm_indx]) # R-executable conditions
+class <-  paste0("class_",as.character(data[,target_indx]) )
+rules <- getRuleMetric(exec,data[,-target_indx], class)
+rules <- pruneRule(rules,data[,-target_indx], class)
+rules <- selectRuleRRF(rules,data[,-target_indx], class)
+rules <- presentRules(rules,colnames(data[,-target_indx]))
+print(rules)
+```
+
+Residual analysis. 
+
+```{r}
+require(randomForest)
+require(plotmo)
+set.seed(1)
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD_hd.csv"))
+
+target <-  data$AGE
+rm_indx <-  which( colnames(data) %in% c("AGE","ID","TOTAL13","MMSCORE") ) 
+X <- data[,-rm_indx]
+rf.mod <- randomForest(X,target, ntrees =  10)
+
+plotres(rf.mod, which = 3)
+
+plotres(rf.mod, which = 4)
+
+```
+
+```{r}
+require(ggplot2)
+set.seed(1)
+X <- data.frame( X1 = runif(30, min = -1, max = 1) )
+target <- 0.5 * X$X1 # + 0.5 * X$X2
+rf <- randomForest( X, target)
+
+plotres(rf, which = 3)
+plotres(rf, which = 4)
+
+testing <- data.frame( X1 = runif(1000, min = -2, max = 2) )
+target <- 0.5 * testing$X1 # + 0.5 * X$X2
+pred <- predict(rf,testing,type="response")
+pred.data <- cbind(testing,target,pred)
+ggplot(pred.data,aes(x=X1,y=pred))+geom_point(size=0.5)
+
+
+```
+

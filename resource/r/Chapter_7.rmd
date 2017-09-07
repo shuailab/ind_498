@@ -1,0 +1,399 @@
+---
+title: "Chapter 7"
+author: "shuai"
+date: "August 25, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+####Analytics Class####
+####Chapter 7####
+# Acknowledgement: 
+# http://members.cbio.mines-paristech.fr/~pchiche/teaching/mlbio/
+# https://www.csie.ntu.edu.tw/~cjlin/papers/guide/guide.pdf
+
+
+```{r}
+# Package installation
+# pkgs <- c( 'ggplot2', 'kernlab', 'ROCR' )
+# install.packages( pkgs ) 
+# source( 'http://bioconductor.org/biocLite.R' )
+# biocLite( 'ALL' )
+
+# For the toy problem
+x = matrix(c(-1,-1,1,1,-1,1,-1,1), nrow = 4, ncol = 2)
+y = c(-1,1,1,-1)
+linear.train <- data.frame(x,y)
+
+# Visualize the distribution of data points of two classes
+require( 'ggplot2' )
+p <- qplot( data=linear.train, X1, X2, colour=factor(y),xlim = c(-1.5,1.5), ylim = c(-1.5,1.5))
+p <- p + labs(title = "Scatterplot of data points of two classes")
+print(p)
+```
+
+
+
+```{r}
+# Train a linear SVM
+x <- cbind(1, poly(x, degree = 2, raw = TRUE))
+coefs = c(1,sqrt(2),sqrt(2),sqrt(2),1,1)
+x <- x * t(matrix(rep(coefs,4),nrow=6,ncol=4))
+linear.train <- data.frame(x,y)
+require( 'kernlab' )
+linear.svm <- ksvm(y ~ ., data=linear.train, type='C-svc', kernel='vanilladot', C=10, scale=c())
+alpha(linear.svm) #scaled alpha vector
+```
+
+
+
+```{r}
+# Generate a dataset with linear boundary
+n <- 200
+p <- 2
+n.pos <- n/2
+x.pos <-  matrix(rnorm( n*p, mean=0, sd=1 ),n.pos, p)
+x.neg <-  matrix(rnorm( n*p, mean=2, sd=1), n-n.pos, p)
+y <- c(rep(1, n.pos), rep(-1, n-n.pos))
+n.train <- floor( 0.8 * n )
+idx.train <- sample( n, n.train )
+is.train <- rep( 0, n )
+is.train[idx.train] <- 1
+linear.data <- data.frame( x=rbind( x.pos, x.neg ), y=y, train=is.train )
+# Extract train and test subsets of the dataset
+linear.train <- linear.data[linear.data$train==1, ]
+linear.train <- subset( linear.train, select=-train )
+linear.test <- linear.data[linear.data$train==0, ]
+linear.test <- subset( linear.test, select=-train )
+str(linear.train)
+str(linear.test)
+```
+
+
+
+```{r}
+# Visualize the distribution of data points of two classes
+require( 'ggplot2' )
+p <- qplot( data=linear.data, x.1, x.2, colour=factor(y) )
+p <- p + labs(title = "Scatterplot of data points of two classes")
+print(p)
+```
+
+
+
+```{r}
+# Train a linear SVM
+require( 'kernlab' )
+linear.svm <- ksvm(y ~ ., data=linear.train, type='C-svc', kernel='vanilladot', C=10, scale=c())
+
+# Plot the model
+plot( linear.svm, data=linear.train )
+```
+
+
+
+```{r}
+# Generate the ROC curve using the testing data
+# Prediction scores
+linear.prediction.score <- predict(linear.svm, linear.test, type='decision')
+# Compute ROC and Precision-Recall curves
+require( 'ROCR')
+linear.roc.curve <- performance( prediction( linear.prediction.score, linear.test$y ),
+                                 measure='tpr', x.measure='fpr' )
+plot(linear.roc.curve,  lwd = 2, col = "orange3", 
+     main = "Validation of the linear SVM model using testing data")
+```
+
+
+
+```{r}
+# Generate the ROC curve using 10-folder cross validation
+n <- nrow(linear.data)
+n.folds=10
+idx <- split(sample(seq(n)), seq(n.folds))
+scores <- rep(0, n)
+for(i in seq(n.folds)) {
+  model <- ksvm(y ~ ., data=linear.data[-idx[[i]], ], kernel='vanilladot', C=100 )
+  scores[idx[[i]]] <- predict( model, linear.data[idx[[i]],], type='decision' )
+}
+plot(performance(prediction(scores, linear.data$y), measure='tpr', x.measure='fpr' ), 
+     lwd = 2, col = "steelblue2",
+     main = "Validation of the linear SVM model using 10-folder cross validation")
+```
+
+
+
+```{r}
+# Cross-validation using caret pacakge
+# install.packages("caret")
+# install.packages("pROC")
+# Training SVM Models
+require(caret)
+require(kernlab)       # support vector machine 
+require(pROC)	       # plot the ROC curves
+# Setup for cross validation
+ctrl <- trainControl(method="repeatedcv",   # 10fold cross validation
+                     repeats=5,		    # do 5 repititions of cv
+                     summaryFunction=twoClassSummary,	# Use AUC to pick the best model
+                     classProbs=TRUE)
+
+#Train and Tune the SVM
+linear.train <- data.frame(linear.train)
+trainX <- linear.train[,1:2]
+trainy= linear.train[,3]
+trainy[which(trainy==1)] = rep("T",length(which(trainy==1)))
+trainy[which(trainy==-1)] = rep("F",length(which(trainy==-1)))
+svm.tune <- train(x = trainX, 
+                  y = trainy, 
+                  method = "svmLinear",   # Linear kernel 
+                  tuneLength = 9,					# 9 values of the cost function
+                  preProc = c("center","scale"),  # Center and scale data
+                  metric="ROC",
+                  trControl=ctrl)
+
+svm.tune
+```
+
+
+
+```{r}
+# Plot the model, interactively adjust C
+# install.packages("manipulate")
+require( 'manipulate' )
+# manipulate(plot( ksvm( y ~ ., data=linear.train, type='C-svc', kernel='vanilladot',
+#                        C=2^c.exponent, scale=c() ), data=linear.train),
+#            c.exponent=slider(-10,10))
+```
+
+
+
+```{r}
+# Generate a dataset with nonlinear boundary
+n = 100
+p = 2
+bottom.left <- matrix(rnorm( n*p, mean=0, sd=1 ),n, p)
+upper.right <- matrix(rnorm( n*p, mean=4, sd=1 ),n, p)
+tmp1 <- matrix(rnorm( n*p, mean=0, sd=1 ),n, p)
+tmp2 <- matrix(rnorm( n*p, mean=4, sd=1 ),n, p)
+upper.left <- cbind( tmp1[,1], tmp2[,2] )
+bottom.right <- cbind( tmp2[,1], tmp1[,2] )
+y <- c( rep( 1, 2 * n ), rep( -1, 2 * n ) )
+idx.train <- sample( 4 * n, floor( 3.5 * n ) )
+is.train <- rep( 0, 4 * n )
+is.train[idx.train] <- 1
+nonlinear.data <- data.frame( x=rbind( bottom.left, upper.right, upper.left, bottom.right ), y=y, train=is.train )
+```
+
+
+
+```{r}
+# Visualize the distribution of data points of two classes
+require( 'ggplot2' )
+p <- qplot( data=nonlinear.data, x.1, x.2, colour=factor(y) )
+p <- p + labs(title = "Scatterplot of data points of two classes")
+print(p)
+```
+
+
+
+```{r}
+# Extract train and test datasets
+nonlinear.train <- nonlinear.data[nonlinear.data$train==1, ]
+nonlinear.train <- subset(nonlinear.train, select=-train)
+nonlinear.test <- nonlinear.data[nonlinear.data$train==0, ]
+nonlinear.test <- subset(nonlinear.test, select=-train )
+
+# Train a nonlinear SVM
+nonlinear.svm <- ksvm(y ~ ., data=nonlinear.train, type='C-svc', kernel='rbf',
+                       kpar=list(sigma=1), C=100, scale=c())
+nonlinear.svm
+plot(nonlinear.svm, data=nonlinear.train)
+```
+
+
+
+```{r}
+# Use cross-validation to choose C
+# install.packages("caret")
+# install.packages("pROC")
+# Training SVM Models
+require(caret)
+require(kernlab)       # support vector machine 
+require(pROC)	       # plot the ROC curves
+# Setup for cross validation
+ctrl <- trainControl(method="repeatedcv",   # 10fold cross validation
+                     repeats=1,		    # do 5 repititions of cv
+                     summaryFunction=twoClassSummary,	# Use AUC to pick the best model
+                     classProbs=TRUE)
+
+#Train and Tune the SVM
+nonlinear.train <- data.frame(nonlinear.train)
+trainX <- nonlinear.train[,1:2]
+trainy= nonlinear.train[,3]
+trainy[which(trainy==1)] = rep("T",length(which(trainy==1)))
+trainy[which(trainy==-1)] = rep("F",length(which(trainy==-1)))
+svm.tune <- train(x = trainX, 
+                  y = trainy, 
+                  method = "svmRadial",   # Radial kernel 
+                  tuneLength = 9,					# 9 values of the cost function
+                  preProc = c("center","scale"),  # Center and scale data
+                  metric="ROC",
+                  trControl=ctrl)
+
+svm.tune
+```
+
+
+
+```{r}
+# Use the expand.grid to specify the search space	
+grid <- expand.grid(sigma = c(0.7, 0.8, 0.9, 1.0, 1.1, 1.2),
+                    C = c(0.2, 0.25, 0.3, 0.35, 0.4)
+)
+
+#Train and Tune the SVM
+nonlinear.train <- data.frame(nonlinear.train)
+trainX <- nonlinear.train[,1:2]
+trainy= nonlinear.train[,3]
+trainy[which(trainy==1)] = rep("T",length(which(trainy==1)))
+trainy[which(trainy==-1)] = rep("F",length(which(trainy==-1)))
+svm.tune <- train(x = trainX, 
+                  y = trainy, 
+                  method = "svmRadial",   # Radial kernel 
+                  tuneLength = 9,					# 9 values of the cost function
+                  preProc = c("center","scale"),  # Center and scale data
+                  metric="ROC",
+                  tuneGrid = grid,
+                  trControl=ctrl)
+
+svm.tune
+```
+
+
+
+```{r}
+# Plot the model, interactively adjust C and the kernel
+#manipulate( plot( ksvm( y ~ ., data=nonlinear.train, type='C-svc', kernel=k,
+#                        C=2^c.exponent, scale=c() ), data=nonlinear.train ),
+#            c.exponent=slider(-10,10),
+#            k=picker('Gaussian'='rbfdot', 'Linear'='vanilladot', 'Laplacian'='laplacedot') )
+```
+
+
+
+```{r}
+#### Dataset of Alzheimer's Disease 
+#### Objective: prediction of diagnosis 
+# filename
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+str(AD)
+```
+
+
+
+```{r}
+# write.csv(AD, file = "ADNI_baseline2.csv")
+# Description of variables
+# ID  ID of the subjects
+# DX_bl Diagnosis (0: normal; 1: patient)
+# Age Age
+# PTGENDER Gender
+# PTEDUCAT Years of education
+# FDG Average FDG-PET
+# AV45 Average AV45 SUVR
+# HippoNV The normalized hippocampus volume
+# e2_1 Apolipoprotein E4 polymorphism
+# e4_1 Apolipoprotein E4 polymorphism
+# rs3818361 CR1 gene rs3818361 polymorphism
+# rs744373 BIN1 gene rs744373 polymorphism
+# rs11136000 Clusterin CLU gene rs11136000 polymorphism
+# rs610932 MS4A6A gene rs610932 polymorphism
+# rs3851179 PICALM gene rs3851179 polymorphism
+# rs3764650 ABCA7 gene rs3764650 polymorphism
+# rs3865444 CD33 gene rs3865444 polymorphism
+# MMSCORE Mini-mental state examination (outcome variable)
+# TOTAL13 Alzheimer's Disease Assessment Scale (outcome variable)
+```
+
+
+
+```{r}
+#Train and Tune the SVM
+n = dim(AD)[1]
+n.train <- floor(0.8 * n)
+idx.train <- sample(n, n.train)
+AD[which(AD[,1]==0),1] = rep("Normal",length(which(AD[,1]==0)))
+AD[which(AD[,1]==1),1] = rep("Diseased",length(which(AD[,1]==1)))
+AD.train <- AD[idx.train,c(1:16)]
+AD.test <- AD[-idx.train,c(1:16)]
+trainX <- AD.train[,c(2:16)]
+trainy= AD.train[,1]
+
+# Setup for cross validation
+ctrl <- trainControl(method="repeatedcv",   # 10fold cross validation
+                     repeats=1,		    # do 5 repititions of cv
+                     summaryFunction=twoClassSummary,	# Use AUC to pick the best model
+                     classProbs=TRUE)
+
+# Use the expand.grid to specify the search space	
+grid <- expand.grid(sigma = c(0.002, 0.005, 0.01, 0.012, 0.015),
+                    C = c(0.3,0.4,0.5,0.6)
+)
+
+svm.tune <- train(x = trainX, 
+                  y = trainy, 
+                  method = "svmRadial",   # Radial kernel 
+                  tuneLength = 9,					# 9 values of the cost function
+                  preProc = c("center","scale"),  # Center and scale data
+                  metric="ROC",
+                  tuneGrid = grid,
+                  trControl=ctrl)
+
+svm.tune
+```
+
+
+
+```{r}
+#Train and Tune the Logistic regression model
+# Setup for cross validation
+ctrl <- trainControl(method="repeatedcv",   # 10fold cross validation
+                     repeats=1,		    # do 5 repititions of cv
+                     number = 10,
+                     summaryFunction=twoClassSummary,	# Use AUC to pick the best model
+                     classProbs=TRUE,
+                     savePredictions = TRUE)
+
+log.cv <- train(x = trainX, 
+                 y = trainy, 
+                 method="glm", 
+                 family="binomial",
+                 tuneLength = 9,					# 9 values of the cost function
+                 preProc = c("center","scale"),  # Center and scale data
+                 metric="ROC",
+                 trControl = ctrl)
+
+log.cv
+```
+
+
+
+```{r}
+# install.packages("e1071")
+require(e1071)
+pred = predict(log.cv, newdata=AD.test[,c(2:16)])
+confusionMatrix(data=pred, AD.test[,1])
+```
+
+
+
+```{r}
+pred = predict(svm.tune, newdata=AD.test[,c(2:16)])
+confusionMatrix(data=pred, AD.test[,1])
+```

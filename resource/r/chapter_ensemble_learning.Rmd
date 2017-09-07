@@ -1,0 +1,278 @@
+---
+title: 'R-Lab: Ensemble Learning'
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE, warning=FALSE, message=FALSE)
+```
+
+A single decision tree (rpart), random forests, and AdaBoost are applied to ADNI_baseline2. First we change the percentage of training data and 50 replicates of data are generated.  The boxplots of the classification error rates for single decision tree (rpart), random forests and AdaBoost are plotted at different percentages of training data. It can be seen, all error rates are reduced as the percentage of the training data increases. The single decision tree is clearly less accurate than the other two ensemble methods. RF has lower error rates than AdaBoost in general. However, as the training data size increases, the gap between RF and AdaBoost seems to decrease. This may indicates that when the training data size is small, RF is more stable due to its advantage of addressing the statistical issue. 
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(randomForest)
+library(RCurl)
+library(gbm)
+library(rpart)
+set.seed(1)
+
+theme_set(theme_gray(base_size = 15) ) 
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+rm_indx <-  which( colnames(data) %in% c("ID","TOTAL13","MMSCORE") ) 
+data <- data[,-rm_indx]
+data$DX_bl <- as.factor(data$DX_bl)
+#target_indx <- which( colnames(data) == "DX_bl" )
+#target <-  data[,target_indx]
+#rm_indx <-  which( colnames(data) %in% c("DX_bl","ID","TOTAL13","MMSCORE") ) 
+#X <- data
+#X <- X[,-rm_indx]
+
+set.seed(1)
+
+err.mat <- NULL
+for( K in c(0.2,0.3,0.4,0.5,0.6,0.7) ){
+    
+    testing.indices <- NULL
+    for(i in 1:50){
+      testing.indices <- rbind(testing.indices, sample(nrow(data),floor( (1-K)*nrow(data)) ) )
+    }
+    
+    for(i in 1:nrow(testing.indices)){
+      
+      testing.ix <- testing.indices[i,]
+      target.testing <- data$DX_bl[testing.ix]
+      
+      tree <- rpart( DX_bl ~ ., data[-testing.ix,]) 
+      pred <- predict(tree, data[testing.ix,],type="class")
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("tree",K, error))
+      
+      rf <- randomForest( DX_bl ~ ., data[-testing.ix,] ) 
+      pred <- predict(rf, data[testing.ix,])
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("RF",K, error))
+      
+      data1 <- data
+      data1$DX_bl <- as.numeric( as.character(data1$DX_bl) )
+      boost <- gbm(DX_bl ~ ., data=data1[-testing.ix,], dist="adaboost", interaction.depth = 6, n.tree = 2000) #cv.folds = 5, 
+      # best.iter <- gbm.perf(boost,method="cv")
+      pred <- predict(boost, data1[testing.ix,], n.tree = 2000, type = 'response') # best.iter n.tree = 400, 
+      pred[pred > 0.5] <- 1; pred[pred <= 0.5] <- 0
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("AdaBoost",K, error))
+    }
+}
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","training_percent","error")
+err.mat <- err.mat %>% mutate( training_percent = as.numeric(as.character(training_percent)), error = as.numeric(as.character(error)) )
+
+ggplot() +
+  geom_boxplot(data = err.mat %>% mutate(training_percent=as.factor(training_percent)), aes(y = error, x = training_percent, color = method)) +
+  geom_point(size=3) 
+
+```
+
+Now we add complexity to each classifier. 
+
+```{r}
+set.seed(1)
+testing.indices <- NULL
+for(i in 1:50){
+  testing.indices <- rbind(testing.indices, sample(nrow(data),floor( (0.3)*nrow(data)) ) )
+}
+  
+
+err.mat <- NULL 
+for(i in 1:nrow(testing.indices)){
+    testing.ix <- testing.indices[i,]
+    target.testing <- data$DX_bl[testing.ix]
+    
+    cp.v <- rev( c(0,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1) )
+    for(j in cp.v){
+      tree <- rpart( DX_bl ~ ., data[-testing.ix,], cp = j ) 
+      pred <- predict(tree, data[testing.ix,],type="class")
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("Tree",j, error))
+    }
+}
+
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","cp","error")
+err.mat <- err.mat %>% mutate( cp = as.numeric(as.character(cp)), error = as.numeric(as.character(error)) )
+err.mat$cp <- factor( err.mat$cp, levels=sort(cp.v,decreasing=TRUE) )
+
+
+ggplot() +
+  geom_boxplot(data = err.mat, aes(y = error, x = cp, color = method)) +
+  geom_point(size=3) 
+```
+
+Adjust the number of trees in AdaBoost. It can be seen that the error rates first go down and stay stable and not getting overfit. 
+
+```{r}
+err.mat <- NULL 
+set.seed(1)
+for(i in 1:nrow(testing.indices)){
+    data1 <- data
+    data1$DX_bl <- as.numeric( as.character(data1$DX_bl) )
+    ntree.v <- c(200,300,400,500,600,800,1000,1200,1400,1600,1800,2000)
+    for(j in ntree.v){
+      boost <- gbm(DX_bl ~ ., data=data1[-testing.ix,], dist="adaboost", interaction.depth = 6, n.tree = j) 
+      # best.iter <- gbm.perf(boost,method="cv")
+      pred <- predict(boost, data1[testing.ix,], n.tree = j, type = 'response')
+      pred[pred > 0.5] <- 1; pred[pred <= 0.5] <- 0
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("AdaBoost",j, error))
+    }
+}
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","num_trees","error")
+err.mat <- err.mat %>% mutate( num_trees = as.numeric(as.character(num_trees)), error = as.numeric(as.character(error)) )
+
+ggplot() +
+  geom_boxplot(data = err.mat %>% mutate(num_trees=as.factor(num_trees)), aes(y = error, x = num_trees, color = method)) +
+  geom_point(size=3) 
+
+```
+
+Now look at random forests with different number of trees. Similar to AdaBoost, RF has high error rates initially at a small number of trees, but then are reduced as more trees are added. Overfitting did not occur as at a large number of trees. 
+
+```{r}
+err.mat <- NULL 
+set.seed(1)
+for(i in 1:nrow(testing.indices)){
+    testing.ix <- testing.indices[i,]
+    target.testing <- data$DX_bl[testing.ix]
+    
+    ntree.v <- c(5,10,50,100,200,400,600,800,1000)
+    for(j in ntree.v){
+      rf <- randomForest( DX_bl ~ ., data[-testing.ix,], ntree = j ) 
+      pred <- predict(rf, data[testing.ix,])
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("RF",j, error))
+    }
+}
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","num_trees","error")
+err.mat <- err.mat %>% mutate( num_trees = as.numeric(as.character(num_trees)), error = as.numeric(as.character(error)) )
+
+ggplot() +
+  geom_boxplot(data = err.mat %>% mutate(num_trees=as.factor(num_trees)), aes(y = error, x = num_trees, color = method)) +
+  geom_point(size=3) 
+```
+
+To solve the statistical issue discussed previously, a diverse set of learners need to be built. In random forests there are two diversity factors, boostrap samples for each tree and random feature selection for each node. First we investigate the effectiveness of using randomly selected samples. To achieve this, we change sampling strategy from sampling with replacement to sampling without replacement, and changing the sampling size from 20% to 100%. 
+
+```{r}
+err.mat <- NULL 
+set.seed(1)
+for(i in 1:nrow(testing.indices)){
+    testing.ix <- testing.indices[i,]
+    target.testing <- data$DX_bl[testing.ix]
+    
+    sample.size.v <- seq(0.1,1,by=0.1)
+    for(j in sample.size.v){
+      sample.size <- floor( nrow(  data[-testing.ix,] ) * j )
+      rf <- randomForest( DX_bl ~ ., data[-testing.ix,], sampsize = sample.size , replace= FALSE ) 
+      pred <- predict(rf, data[testing.ix,])
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("RF",j, error))
+    }
+}
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","sample_size","error")
+err.mat <- err.mat %>% mutate( sample_size = as.numeric(as.character(sample_size)), error = as.numeric(as.character(error)) )
+
+ggplot() +
+  geom_boxplot(data = err.mat %>% mutate(sample_size=as.factor(sample_size)), aes(y = error, x = sample_size, color = method)) +
+  geom_point(size=3) 
+```
+
+Now we change the randomness in the features tested in a tree node. From using one feature to all features. 
+
+```{r}
+err.mat <- NULL 
+set.seed(1)
+for(i in 1:nrow(testing.indices)){
+    testing.ix <- testing.indices[i,]
+    target.testing <- data$DX_bl[testing.ix]
+    
+    num.fea.v <- 1 : ( ncol(data)-1 )
+    for(j in num.fea.v){
+      rf <- randomForest( DX_bl ~ ., data[-testing.ix,], mtry = j ) 
+      pred <- predict(rf, data[testing.ix,])
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("RF",j, error))
+    }
+}
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","num_fea","error")
+err.mat <- err.mat %>% mutate( num_fea = as.numeric(as.character(num_fea)), error = as.numeric(as.character(error)) )
+
+ggplot() +
+  geom_boxplot(data = err.mat %>% mutate(num_fea=as.factor(num_fea)), aes(y = error, x = num_fea, color = method)) +
+  geom_point(size=3) 
+```
+
+Now let's use all samples and change the number of features.
+
+```{r}
+err.mat <- NULL 
+set.seed(1)
+for(i in 1:nrow(testing.indices)){
+    testing.ix <- testing.indices[i,]
+    target.testing <- data$DX_bl[testing.ix]
+    
+    num.fea.v <- 1 : ( ncol(data)-1 )
+    for(j in num.fea.v){
+      sample.size <- nrow(  data[-testing.ix,] ) 
+      rf <- randomForest( DX_bl ~ ., data[-testing.ix,], mtry = j , sampsize = sample.size, replace= FALSE ) 
+      pred <- predict(rf, data[testing.ix,])
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("RF",j, error))
+    }
+}
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","num_fea","error")
+err.mat <- err.mat %>% mutate( num_fea = as.numeric(as.character(num_fea)), error = as.numeric(as.character(error)) )
+
+ggplot() +
+  geom_boxplot(data = err.mat %>% mutate(num_fea=as.factor(num_fea)), aes(y = error, x = num_fea, color = method)) +
+  geom_point(size=3) 
+```
+
+Also change the number of samples selected for each tree using all features. 
+
+```{r}
+err.mat <- NULL 
+set.seed(1)
+for(i in 1:nrow(testing.indices)){
+    testing.ix <- testing.indices[i,]
+    target.testing <- data$DX_bl[testing.ix]
+    
+    sample.size.v <- seq(0.1,1,by=0.1)
+    for(j in sample.size.v){
+      traing.data <- data[-testing.ix,] 
+      sample.size <- floor( nrow(traing.data) * j ) 
+      rf <- randomForest( DX_bl ~ ., traing.data, mtry = ncol(traing.data)-1, sampsize = sample.size, replace= FALSE)
+      pred <- predict(rf, data[testing.ix,])
+      error <- length(which(as.character(pred) != target.testing))/length(target.testing)
+      err.mat <- rbind(err.mat, c("RF",j, error))
+    }
+}
+err.mat <- as.data.frame(err.mat)
+colnames(err.mat) <- c("method","sample_size","error")
+err.mat <- err.mat %>% mutate( sample_size = as.numeric(as.character(sample_size)), error = as.numeric(as.character(error)) )
+
+ggplot() +
+  geom_boxplot(data = err.mat %>% mutate(sample_size=as.factor(sample_size)), aes(y = error, x = sample_size, color = method)) +
+  geom_point(size=3) 
+```

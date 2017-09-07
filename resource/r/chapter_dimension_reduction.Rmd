@@ -1,0 +1,265 @@
+---
+title: 'R-Lab: Dimension Reduction'
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE, warning=FALSE, message=FALSE)
+```
+
+We use the ADNI_bl_hd.csv data, and use all the features to predict the age (as a classification problem). 
+
+First apply random forests to the data set. The importance scores of variables are be plotted below. The variable names are ommitted due to limited space. This chart provide a ranking of all variables in terms of predictive power, and the top variables are ST62TA, ST59TS, ST56TA, ST58CV and ST26TS. However, a large number of variables have non-zero importane scores, and if we use a threshold to select a variable subset, there may be redundant variables selected. 
+
+```{r}
+require(dplyr)
+require(tidyr)
+require(inTrees)
+require(ggplot2)
+require(randomForest)
+require(RRF)
+require(RCurl)
+set.seed(1)
+theme_set(theme_gray(base_size = 18))
+
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD_hd.csv"))
+data$AGE <- as.factor( dicretizeVector(data$AGE,K=2))
+target <-  data$AGE
+rm_indx <-  which( colnames(data) %in% c("AGE","ID","TOTAL13","MMSCORE") ) 
+X <- data[,-rm_indx]
+X1 <- cbind(X,X,X)
+colnames(X1) <- paste0("Y",1:ncol(X1))
+for(i in 1:ncol(X1)){
+  perc <- 0.1
+  index <- sample(nrow(X1),floor(nrow(X1)*perc))
+  X1[,i][sort(index)] <- (X1[,i])[index]
+}
+X <- cbind(X,X1)
+
+rf <- randomForest( X, target ) 
+
+imp <- as.data.frame(rf$importance)
+colnames(imp)[colnames(imp) == "MeanDecreaseGini"] <- "importance"
+imp <- imp[order(imp$importance,decreasing = TRUE),,drop=FALSE]
+imp$variable <- rownames(imp)
+imp$variable <- factor(imp$variable, levels = as.character( imp$variable ) )
+ggplot(data=imp, aes(x=variable,y=importance)) + geom_bar(stat="identity",aes(factor(variable)),fill="red" ) +
+  theme(axis.text.x=element_blank()) 
+```
+
+Now apply the regularized random forests to the data. The importance scores from the RRF are plotted below. Clearly a much smaller number of variables have non-zero importance scores, compared to ordinary random forests. 
+```{r}
+rrf <- RRF( X, target ) 
+imp <- as.data.frame(rrf$importance)
+colnames(imp)[colnames(imp) == "MeanDecreaseGini"] <- "importance"
+imp <- imp[order(imp$importance,decreasing = TRUE),,drop=FALSE]
+imp$variable <- rownames(imp)
+imp$variable <- factor(imp$variable, levels = as.character( imp$variable ) )
+ggplot(data=imp, aes(x=variable,y=importance)) + geom_bar(stat="identity",aes(factor(variable)),fill="red" ) +
+  theme(axis.text.x=element_blank()) 
+```
+
+
+Now apply the guided regularized random forests to the data. The importance scores from the GRRF are plotted below. Similarly the number of variables with non-zero importance scores is much smaller than ordinary random forests. 
+```{r}
+rf <- randomForest( X, target ) 
+impRF <- rf$importance 
+impRF <- impRF[,"MeanDecreaseGini"]
+imp <- impRF/(max(impRF)) #normalize the importance scores into [0,1]
+gamma <- 0.1
+coefReg <- (1-gamma)*1.0 + gamma*imp   # each variable has a coefficient, which depends on the importance score from the ordinary RF and the parameter: gamma
+grrf <- RRF(X,target, flagReg=1, coefReg=coefReg)
+
+imp <- as.data.frame(grrf$importance)
+colnames(imp)[colnames(imp) == "MeanDecreaseGini"] <- "importance"
+imp <- imp[order(imp$importance,decreasing = TRUE),,drop=FALSE]
+imp$variable <- rownames(imp)
+imp$variable <- factor(imp$variable, levels = as.character( imp$variable ) )
+ggplot(data=imp, aes(x=variable,y=importance)) + geom_bar(stat="identity",aes(factor(variable)),fill="red" ) +
+  theme(axis.text.x=element_blank()) 
+```
+
+The previous charts illustrate that RRF and GRRF use a much smaller number of variables compared to ordinary random forests. Here we evaluate the quality of the features by the classification error from leave-one-out testing (at each time one instance is used for testing and others used for training).   
+
+First we select the variables ranked high from random forests, by changing the number of variables from 1 to 100. 
+```{r}
+
+set.seed(1)
+testing.indices <- NULL
+for(i in 1:50){
+  testing.indices <- rbind(testing.indices, sample(nrow(data),floor( 1*nrow(data)/3) ) )
+}
+
+err.mat.rf <- NULL
+for( K in c(1, (1:10) * 10, 150, 200)  ){
+    pred <- NULL
+    for(i in 1:nrow(testing.indices)){
+      
+      testing.ix <- testing.indices[i,]
+      X.training <- X[-testing.ix,]
+      target.training <- target[-testing.ix]
+      X.testing <- X[testing.ix,,drop=FALSE]
+      target.testing <- target[testing.ix]
+      
+      rf <- randomForest( X.training, target.training ) 
+      impRF <- rf$importance 
+      impRF <- impRF[,"MeanDecreaseGini"]
+      ix <- order(impRF,decreasing=TRUE) 
+
+      X.training.new <- X.training[,ix[1:K],drop=FALSE]
+      rf <- randomForest( X.training.new, target.training ) 
+      
+      target.pred <- predict(rf, X.testing)
+      # pred <- c(pred, as.character(target.pred) )
+      
+      error <- length(which(as.character(target.pred) != target.testing))/length(target.testing)
+      err.mat.rf <- rbind(err.mat.rf, c(K, error))
+    }
+    #error <- length(which(pred != target))/length(pred)
+    #err.mat.rf <- rbind(err.mat.rf, c(K,error))
+}
+err.mat.rf <- as.data.frame(err.mat.rf)
+colnames(err.mat.rf) <- c("num_features","error")
+
+# err.mat.rf$num_features <- factor( err.mat.rf$num_features , unique( err.mat.rf$num_features  )  )
+ggplot() +
+  geom_boxplot(data = err.mat.rf %>% mutate(num_features = as.factor(num_features)), aes(y = error, x = num_features)) +
+  geom_point(size=3) 
+
+```
+
+
+```{r}
+set.seed(1)
+err.mat.rrf <- NULL
+for( coefI in c(0.5,0.6,0.7,0.8,0.9,0.95,1)  ){
+    pred <- NULL
+    for(i in 1:nrow(testing.indices)){
+      testing.ix <- testing.indices[i,]
+      X.training <- X[-testing.ix,]
+      target.training <- target[-testing.ix]
+      X.testing <- X[testing.ix,,drop=FALSE]
+      target.testing <- target[testing.ix]    
+    
+      rrf <- RRF( X.training, target.training , coefReg = coefI) 
+      
+      X.training.new <- X.training[,rrf$feaSet,drop=FALSE]
+      rf <- randomForest( X.training.new, target.training ) 
+      
+      target.pred <- predict(rf, X.testing)
+      # pred <- c(pred, as.character(target.pred) )
+      error <- length(which(as.character(target.pred) != target.testing))/length(target.testing)
+      err.mat.rrf <- rbind(err.mat.rrf, c(coefI, length(rrf$feaSet), error))
+    }
+    #error <- length(which(pred != target))/length(pred)
+    #err.mat.rrf <- rbind(err.mat.rrf, c(coefI, mean(num.fea.v), error))
+}
+err.mat.rrf <- as.data.frame(err.mat.rrf)
+colnames(err.mat.rrf) <- c("coef","num_features","error")
+# err.mat.rrf <- err.mat.rrf %>% mutate(coef=as.factor(coef)) 
+ggplot() +
+  geom_boxplot(data = err.mat.rrf %>% mutate(coef=as.factor(coef)), aes(y = error, x = coef)) +
+  geom_point(size=3) 
+
+ggplot() +
+  geom_boxplot(data = err.mat.rrf %>% mutate(coef=as.factor(coef)), aes(y = num_features, x = coef)) +
+  geom_point(size=3) 
+
+```
+
+Here we try differnet parameters on GRRF and check the number of features and error rates. The weights come from the importance scores from random forests.
+```{r}
+set.seed(1)
+err.mat.grrf <- NULL
+for( gammaI in c(0.4,0.3,0.2,0.1,0.05,0)  ){
+    pred <- NULL
+    num.fea.v <- NULL
+    
+    for(i in 1:nrow(testing.indices)){
+      testing.ix <- testing.indices[i,]
+      X.training <- X[-testing.ix,]
+      target.training <- target[-testing.ix]
+      X.testing <- X[testing.ix,,drop=FALSE]
+      target.testing <- target[testing.ix]
+      
+      rf <- randomForest( X.training, target.training ) 
+      impRF <- rf$importance 
+      impRF <- impRF[,"MeanDecreaseGini"]
+      imp <- impRF/(max(impRF)) 
+      coefReg <- (1-gammaI)*1 + gammaI*imp   
+      
+      grrf <- RRF(X.training,target.training, flagReg=1, coefReg=coefReg)
+      
+      # num.fea.v <- c(num.fea.v, length(grrf$feaSet))
+      X.training.new <- X.training[,grrf$feaSet,drop=FALSE]
+      
+      rf <- randomForest( X.training.new, target.training ) 
+      
+      target.pred <- predict(rf, X.testing)
+      # pred <- c(pred, as.character(target.pred) )
+      error <- length(which(as.character(target.pred) != target.testing))/length(target.testing)
+      err.mat.grrf <- rbind(err.mat.grrf, c(gammaI, length(grrf$feaSet), error))
+    }
+}
+
+err.mat.grrf <- as.data.frame(err.mat.grrf)
+colnames(err.mat.grrf) <- c("gamma","num_features","error")
+# err.mat.grrf <- err.mat.grrf %>% mutate(gamma=as.factor(gamma)) 
+ggplot() +
+  geom_boxplot(data = err.mat.grrf %>% mutate(gamma=as.factor(gamma)), aes(y = error, x = gamma)) +
+  geom_point(size=3) 
+
+ggplot() +
+  geom_boxplot(data = err.mat.grrf %>% mutate(gamma=as.factor(gamma)), aes(y = num_features, x = gamma)) +
+  geom_point(size=3) 
+
+```
+
+
+
+```{r}
+err.mat.rf <- as.data.frame(err.mat.rf)
+err.mat.rf$method <- "RF"
+
+err.mat.rrf <- as.data.frame(err.mat.rrf)
+err.mat.rrf$method <- "RRF"
+
+err.mat.grrf <- as.data.frame(err.mat.grrf)
+err.mat.grrf$method <- "GRRF"
+
+err.mat.rrf.summary <- err.mat.rrf %>% group_by(coef,method) %>% summarize(num_features=mean(num_features), sd = sd(error), error=mean(error), upper = error + sd, lower = error - sd) %>% ungroup()
+err.mat.grrf.summary <- err.mat.grrf %>% group_by(gamma,method) %>% summarize(num_features=mean(num_features),  sd = sd(error), error=mean(error), upper = error + sd, lower = error - sd) %>% ungroup()
+err.mat.rf.summary <- err.mat.rf %>% group_by(num_features,method) %>% summarize(sd = sd(error),error=mean(error), upper = error + sd, lower = error - sd) %>% ungroup()
+err.mat <- rbind( err.mat.rf.summary[,c("num_features","error","method","lower","upper")], 
+                  err.mat.rrf.summary[,c("num_features","error","method","lower","upper")] , 
+                  err.mat.grrf.summary[,c("num_features","error","method","lower","upper")] )
+
+#ggplot(err.mat, aes(x=num_features, y=error, fill=method)) +
+#  geom_boxplot(position=position_dodge(1))
+
+ggplot(err.mat, aes(x=num_features, y=error, group=method, colour = method)) +
+  geom_line(linetype = "dashed")+
+  geom_point() + geom_ribbon(data=err.mat,aes(ymin=lower,ymax=upper),alpha=0.05)
+
+ggplot(err.mat, aes(x=num_features, y=error, group=method, colour = method)) +
+  geom_line(linetype = "dashed")+
+  geom_point()
+
+
+#new.data <- err.mat %>% group_by(num_features,method) %>% summarize(sd=sd(error),error=median(error)) %>% #mutate(upper=error+sd,lower=error-sd)
+#ggplot(new.data, aes(x=num_features, y=error, group=method, colour = method)) +
+#  geom_line(linetype = "dashed")+
+#  geom_point() + ylim(0,0.5)
+#  # geom_ribbon(data=new.data,aes(ymin=lower,ymax=upper),alpha=1)
+
+```
+
+
+
+
+
+

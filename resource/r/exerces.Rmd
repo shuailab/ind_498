@@ -1,0 +1,29 @@
+---
+title: 'R-Lab: Decision Trees'
+output:
+  word_document: default
+  html_document: default
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE, warning=FALSE, message=FALSE)
+```
+
+```{r}
+require(mlbench)
+require(rpart)
+library(help = "datasets")
+data("iris")
+head(iris)
+
+```
+
+
+
+
+
+
+
+
+

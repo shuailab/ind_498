@@ -124,13 +124,13 @@ $(document).ready(function () {
 <pre class="r"><code>library(dplyr)
 library(tidyr)
 library(ggplot2)
-require(randomForest)
+library(randomForest)
+library(RCurl)
 set.seed(1)
 
 theme_set(theme_gray(base_size = 15))
 
-path &lt;- &quot;../../data/ADNI/ADNI_baseline2.csv&quot;
-data &lt;- read.csv(path, header = TRUE)
+data &lt;- read.csv(text = getURL(&quot;https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv&quot;))
 
 target_indx &lt;- which(colnames(data) == &quot;DX_bl&quot;)
 target &lt;- paste0(&quot;class_&quot;, as.character(data[, target_indx]))

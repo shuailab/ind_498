@@ -1,0 +1,213 @@
+---
+title: "Chapter 6"
+author: "shuai"
+date: "August 25, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#### Example: Alzheimer's Disease
+# filename
+setwd("C:/Users/shuai/Google Drive/Shuai/Paper/Working/2017 Analytics Book/analytics book/data/ADNI")
+AD <- read.csv('../Data/ADNI_baseline.csv', header = TRUE)
+AD$ID = c(1:dim(AD)[1])
+str(AD)
+```
+
+```{r}
+# Description of variables
+# ID  ID of the subjects
+# Age Age
+# PTGENDER Gender
+# PTEDUCAT Years of education
+# FDG Average FDG-PET
+# AV45 Average AV45 SUVR
+# HippoNV The normalized hippocampus volume
+# e2_1 Apolipoprotein E4 polymorphism
+# e4_1 Apolipoprotein E4 polymorphism
+# rs3818361 CR1 gene rs3818361 polymorphism
+# rs744373 BIN1 gene rs744373 polymorphism
+# rs11136000 Clusterin CLU gene rs11136000 polymorphism
+# rs610932 MS4A6A gene rs610932 polymorphism
+# rs3851179 PICALM gene rs3851179 polymorphism
+# rs3764650 ABCA7 gene rs3764650 polymorphism
+# rs3865444 CD33 gene rs3865444 polymorphism
+# MMSCORE Mini-mental state examination (outcome variable)
+# TOTAL13 Alzheimer's Disease Assessment Scale (outcome variable)
+```
+
+```{r}
+# fit a full-scale model
+AD_full <- AD[,c(1:16)]
+lm.AD <- lm(MMSCORE ~ ., data = AD_full)
+summary(lm.AD)
+
+# Automatic model selection
+lm.AD.F <- step(lm.AD, direction="backward", test="F")
+
+# Conduct diagnostics of the model
+# install.packages("ggfortify")
+library("ggfortify")
+autoplot(lm.AD.F, which = 1:6, ncol = 3, label.size = 3)
+```
+
+```{r}
+# For comparison, let's simulate data 
+# from a model that fits the assumptions
+x1 <- rnorm(100, 0, 1)
+x2 <- rnorm(100, 0, 1)
+beta1 <- 1
+beta2 <- 1
+mu <- beta1 * x1 + beta2 * x2
+y <- rnorm(100, mu, 1)
+lm.XY <- lm(y ~ ., data = data.frame(y,x1,x2))
+summary(lm.XY)
+# Conduct diagnostics of the model
+library("ggfortify")
+autoplot(lm.XY, which = 1:6, ncol = 3, label.size = 3)
+```
+
+```{r}
+# Evaluate the variable importance by all subsets regression
+# install.packages("leaps")
+library(leaps)
+leaps<-regsubsets(MMSCORE ~ ., data = AD,nbest=4)
+# view results 
+summary(leaps)
+# plot a table of models showing variables in each model.
+# models are ordered by the selection statistic.
+plot(leaps,scale="r2")
+```
+
+```{r}
+# Extract the covariance matrix of the regression parameters
+Sigma = vcov(lm.AD.F)
+# Visualize the correlation matrix of the estimated regression parameters
+# install.packages("corrplot")
+library(corrplot)
+corrplot(cov2cor(Sigma), method="ellipse")
+# Visualize the correlation matrix of the predictors
+Sigma = cor(AD[,c(3,4,5,6,10,12,14,15)])
+corrplot(cov2cor(Sigma), method="ellipse")
+```
+
+```{r}
+# Performance analysis of classification models
+#### Dataset of Alzheimer's Disease 
+#### Objective: prediction of diagnosis 
+# filename
+setwd("C:/Users/shuai/Google Drive/Shuai/Paper/Working/2017 Analytics Book/analytics book/data/ADNI")
+AD <- read.csv('ADNI_baseline2.csv', header = TRUE)
+str(AD)
+```
+
+```{r}
+# write.csv(AD, file = "ADNI_baseline2.csv")
+# Description of variables
+# ID  ID of the subjects
+# DX_bl Diagnosis (0: normal; 1: patient)
+# Age Age
+# PTGENDER Gender
+# PTEDUCAT Years of education
+# FDG Average FDG-PET
+# AV45 Average AV45 SUVR
+# HippoNV The normalized hippocampus volume
+# e2_1 Apolipoprotein E4 polymorphism
+# e4_1 Apolipoprotein E4 polymorphism
+# rs3818361 CR1 gene rs3818361 polymorphism
+# rs744373 BIN1 gene rs744373 polymorphism
+# rs11136000 Clusterin CLU gene rs11136000 polymorphism
+# rs610932 MS4A6A gene rs610932 polymorphism
+# rs3851179 PICALM gene rs3851179 polymorphism
+# rs3764650 ABCA7 gene rs3764650 polymorphism
+# rs3865444 CD33 gene rs3865444 polymorphism
+# MMSCORE Mini-mental state examination (outcome variable)
+# TOTAL13 Alzheimer's Disease Assessment Scale (outcome variable)
+# Automatic selection of the model
+```
+
+
+
+```{r}
+logit.AD.full <- glm(DX_bl ~ ., data = AD[,c(1:16)], family = "binomial")
+logit.AD.final <- step(logit.AD.full, direction="both", trace = 0)
+summary(logit.AD.final)
+```
+
+```{r}
+# thresholds for classification given model proportion predictions for each observation
+thresh  <- seq(0,1,by=0.1)
+# predicted probabilities
+Yhat <- fitted(logit.AD.final)
+
+# Name: lower (0) = NonEvent, higher (1) = Event
+YObs <- cut(AD$DX_bl, breaks = c(-Inf, mean(AD$DX_bl), Inf)
+            , labels = c("NonEvent", "Event"))
+
+classify.table <- data.frame(Thresh     = rep(NA, length(thresh))
+                             , Cor.Event  = rep(NA, length(thresh))
+                             , Cor.NonEv  = rep(NA, length(thresh))
+                             , Inc.Event  = rep(NA, length(thresh))
+                             , Inc.NonEv  = rep(NA, length(thresh))
+                             , Cor.All    = rep(NA, length(thresh))
+                             , Sens       = rep(NA, length(thresh))
+                             , Spec       = rep(NA, length(thresh))
+                             , Fal.P      = rep(NA, length(thresh))
+                             , Fal.N      = rep(NA, length(thresh)))
+
+for (i.thresh in 1:length(thresh)) {
+  # choose a threshold for dichotomizing according to predicted probability
+  YhatPred <- cut(Yhat, breaks = c(-Inf, thresh[i.thresh], Inf)
+                  , labels = c("NonEvent", "Event"))
+  
+  # contingency table and marginal sums
+  cTab <- table(YhatPred, YObs)
+  addmargins(cTab)
+  
+  # Classification Table
+  classify.table$Thresh   [i.thresh] <- thresh[i.thresh]                  # Prob.Level
+  classify.table$Cor.Event[i.thresh] <- cTab[2,2]                         # Correct.Event
+  classify.table$Cor.NonEv[i.thresh] <- cTab[1,1]                         # Correct.NonEvent
+  classify.table$Inc.Event[i.thresh] <- cTab[2,1]                         # Incorrect.Event
+  classify.table$Inc.NonEv[i.thresh] <- cTab[1,2]                         # Incorrect.NonEvent
+  classify.table$Cor.All  [i.thresh] <- 100 * sum(diag(cTab)) / sum(cTab) # Correct.Overall
+  classify.table$Sens     [i.thresh] <- 100 * cTab[2,2] / sum(cTab[,2])   # Sensitivity
+  classify.table$Spec     [i.thresh] <- 100 * cTab[1,1] / sum(cTab[,1])   # Specificity
+  classify.table$Fal.P    [i.thresh] <- 100 * cTab[2,1] / sum(cTab[2,])   # False.Pos
+  classify.table$Fal.N    [i.thresh] <- 100 * cTab[1,2] / sum(cTab[1,])   # False.Neg
+}
+round(classify.table, 1)
+# Thresh = 0.5 classification table
+YhatPred <- cut(Yhat, breaks=c(-Inf, 0.5, Inf), labels=c("NonEvent", "Event"))
+# contingency table and marginal sums
+cTab <- table(YhatPred, YObs)
+addmargins(cTab)
+round(subset(classify.table, Thresh == 0.5), 1)
+```
+
+```{r}
+# Simulate a clustering structure
+X <- c(rnorm(200, 0, 1), rnorm(200, 10,2), rnorm(200,20,1), rnorm(200,40, 2))
+Y <- c(rnorm(800, 0, 1))
+plot(X,Y, ylim = c(-5, 5), pch = 19, col = "gray25")
+# use GMM to identify the clusters
+require(mclust)
+XY.clust <- Mclust(data.frame(X,Y))
+summary(XY.clust)
+plot(XY.clust)
+```
+
+```{r}
+# install.packages("mclust")
+require(mclust)
+AD.Mclust <- Mclust(AD[,c(3,4,5,6,10,12,14,15)])
+summary(AD.Mclust)
+AD.Mclust$data = AD.Mclust$data[,c(1:4)]
+# plot(AD.Mclust)
+```

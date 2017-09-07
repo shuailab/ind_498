@@ -1,0 +1,118 @@
+---
+title: 'R-Lab: inTrees'
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE,dpi=500, warning=FALSE, message=FALSE)
+```
+
+
+```{r}
+rm(list=ls(all=TRUE))
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+library(inTrees)
+set.seed(1)
+data <- rbind( c("1","1","C0"), 
+               c("1","0","C1"), 
+               c("0","1","C1"), 
+               c("0","0","C1"),
+               c("0","0","C0"),
+               c("0","0","C0"),
+               c("0","0","C0")
+                ) %>% as.data.frame()
+colnames(data) <- c("X1","X2","Classs")
+
+
+rf <- randomForest( Classs ~ ., data = data, keep.inbag = TRUE) 
+X <- data[,c("X1","X2")]
+target <- data$Classs
+
+imp <- as.data.frame(rf$importance)
+colnames(imp)[colnames(imp) == "MeanDecreaseGini"] <- "importance"
+imp <- imp[order(imp$importance,decreasing = FALSE),,drop=FALSE]
+imp$feature <- rownames(imp)
+imp$feature <- factor(imp$feature, levels = as.character( imp$feature ) )
+theme_set(theme_gray(base_size = 18))
+ggplot(data=imp, aes(x=feature,y=importance)) + geom_bar(stat="identity",aes(factor(feature)),fill="red" ) +
+  theme( axis.title.y=element_blank(), axis.text.y = element_text( hjust = 1, size = 15)) + coord_flip()
+
+```
+
+
+
+```{r}
+
+rm(list=ls(all=TRUE))
+library(arules)
+library(randomForest)
+library(RRF)
+library(inTrees)
+library(reshape)
+library(ggplot2)
+library(RCurl)
+set.seed(1)
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+target_indx <- which( colnames(data) == "DX_bl" )
+target <-  paste0("class_",as.character(data[,target_indx]) )
+rm_indx <-  which( colnames(data) %in% c("DX_bl","ID","TOTAL13","MMSCORE") ) 
+X <- data
+X <- X[,-rm_indx]
+for(i in 1:ncol(X)) X[,i] <- as.factor( dicretizeVector(X[,i],K=3))
+
+rf <- randomForest(X, as.factor(target))
+
+treeList <- RF2List(rf)  # transform rf object to an inTrees' format
+exec <- extractRules(treeList,X) # R-executable conditions
+class <-  paste0("class_",as.character(target) )
+rules <- getRuleMetric(exec,X, target)
+print( rules[order(as.numeric(rules[,"len"])),][1:5,]  ) 
+
+rules.pruned <- pruneRule(rules, X, target, maxDecay = 0.005, typeDecay = 2)
+
+length <- data.frame( original = as.numeric(rules[,"len"]), pruned = as.numeric(rules.pruned[,"len"])  )
+ggplot(melt(length), aes(value, fill = variable)) + geom_histogram(position = "dodge",binwidth=0.4) + ggtitle("Histogram of Lengths") + theme(plot.title = element_text(hjust = 0.5))
+
+frequency <- data.frame( original = as.numeric(rules[,"freq"]), pruned = as.numeric(rules.pruned[,"freq"])  )
+ggplot(melt(frequency), aes(value, fill = variable)) + geom_histogram(position = "dodge",binwidth=0.05) + ggtitle("Histogram of Frequencies") + theme(plot.title = element_text(hjust = 0.5))
+
+error <- data.frame( original = as.numeric(rules[,"err"]), pruned = as.numeric(rules.pruned[,"err"])  )
+ggplot(melt(error), aes(value, fill = variable)) + geom_histogram(position = "dodge",binwidth=0.01) + ggtitle("Histogram of Errors") + theme(plot.title = element_text(hjust = 0.5))
+
+rules.pruned <- pruneRule(rules,X, target, maxDecay = 0.05, typeDecay = 1)
+
+length <- data.frame( original = as.numeric(rules[,"len"]), pruned = as.numeric(rules.pruned[,"len"])  )
+ggplot(melt(length), aes(value, fill = variable)) + geom_histogram(position = "dodge",binwidth=0.4) + ggtitle("Histogram of Lengths") + theme(plot.title = element_text(hjust = 0.5))
+
+frequency <- data.frame( original = as.numeric(rules[,"freq"]), pruned = as.numeric(rules.pruned[,"freq"])  )
+ggplot(melt(frequency), aes(value, fill = variable)) + geom_histogram(position = "dodge",binwidth=0.05) + ggtitle("Histogram of Frequencies") + theme(plot.title = element_text(hjust = 0.5))
+
+error <- data.frame( original = as.numeric(rules[,"err"]), pruned = as.numeric(rules.pruned[,"err"])  )
+ggplot(melt(error), aes(value, fill = variable)) + geom_histogram(position = "dodge",binwidth=0.01) + ggtitle("Histogram of Errors") + theme(plot.title = element_text(hjust = 0.5))
+
+rules.selected <- selectRuleRRF(rules.pruned,X, target)
+rules.present <- presentRules(rules.selected,colnames(X)) 
+print(cbind(ID = 1:nrow(rules.present),rules.present[,c("condition","pred")]) )
+print(cbind(ID = 1:nrow(rules.present),rules.present[,c("len","freq","err")]) )
+
+freqPattern <- getFreqPattern(rules.pruned)
+top.pattern <- (freqPattern[which(as.numeric(freqPattern[,"len"])>=2),][1:5,])
+print(  presentRules(top.pattern,colnames(X))    )
+
+learner <- buildLearner(rules.selected,X,target)
+learner.readable <- presentRules(learner,colnames(X))  
+print(cbind(ID = 1:nrow(learner.readable),learner.readable[,c("condition","pred")]) )
+print(cbind(ID = 1:nrow(learner.readable),learner.readable[,c("len","freq","err")]) )
+```
+
+
+
+
+

@@ -1,0 +1,310 @@
+---
+title: 'R-Lab: Random Forests'
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE, warning=FALSE, message=FALSE)
+```
+
+
+Here a data set with two predictor variables and a class variable are simulated. The classes are sepearable by a linear combination of the two predictor variables. 
+```{r}
+rm(list=ls(all=TRUE))
+library(rpart)
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+ndata <- 2000
+X1 <- runif(ndata, min = 0, max = 1)
+X2 <- runif(ndata, min = 0, max = 1)
+data <- data.frame(X1,X2)
+data <- data %>% mutate( X12 = 0.5 * (X1 - X2), Y = ifelse(X12>=0,1,0)  )
+data <- data  %>% select(-X12) %>%  mutate( Y = as.factor(as.character(Y) ))
+ggplot(data,aes(x=X1,y=X2,color=Y))+geom_point() #+labs(title = "Data points")
+```
+
+Random forests and a single decision tree are applied to the data. The predictions are plotted in the following graphs. The classification boundary of random forets are much smoother than the one of the decision tree, and is a better approximation of the linear classification boundary. 
+
+```{r}
+rf_model <- randomForest( Y ~ ., data = data) 
+tree_model <- rpart( Y ~ ., data = data)  
+
+pred_rf <- predict(rf_model, data,type="prob")[,1]
+pred_tree <- predict(tree_model, data,type="prob")[,1]
+data_pred <- data %>% mutate( pred_rf_class = ifelse( pred_rf <0.5,0,1)  ) %>% 
+          mutate( pred_rf_class = as.factor(as.character(pred_rf_class) )) %>%
+          mutate( pred_tree_class = ifelse( pred_tree <0.5,0,1)  ) %>% 
+          mutate( pred_tree_class = as.factor(as.character(pred_tree_class) )) 
+ggplot(data_pred,aes(x=X1,y=X2,color=pred_tree_class))+geom_point()  #+labs(title = "Classification bounday from a single decision tree")
+ggplot(data_pred,aes(x=X1,y=X2,color=pred_rf_class))+geom_point() #+labs(title = "Classification bounday from random forests")
+
+```
+
+Here we plot the Gini index and entropy values versus the percentage of class 1 (for two-class problems). 
+
+```{r}
+entropy <- function(p_v){
+  e <- 0
+  for(p in p_v){
+    if(p==0){
+      this_term <- 0
+    }else{
+      this_term <- -p * log2( p )
+    }
+    e <- e + this_term
+  }
+  return(e)
+}
+gini <- function(p_v){
+  e <- 0
+  for(p in p_v){
+    if(p==0){
+      this.term <- 0
+    }else{
+      this.term <- p * (1-p)
+    }
+    e <- e + this.term
+  }
+  return(e)
+}
+
+entropy.v <- NULL
+gini.v <- NULL
+p.v <- seq(0,1,by=0.01)
+for(p in p.v){
+  entropy.v <- c(entropy.v, (entropy( c(p,1-p) ) ) )
+  gini.v <- c(gini.v, (gini( c(p,1-p) ) ) )
+}
+plot(p.v, gini.v, type = "l", ylim=c(0,1), xlab="percentage of class 1", col = "red", ylab="impurity measure", cex.lab=1.5, cex.axis=1.5, cex.main=1.5, cex.sub=1.5)
+lines(p.v, entropy.v, col = "blue")
+legend("topleft", legend=c("Entropy", "Gini index"),
+       col=c("blue", "red"), lty=c(1,1), cex=1)
+
+p <- 3/4
+gini( c(p,1-p) )
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+set.seed(1)
+data <- rbind( c("0","0","C0"), 
+               c("1","0","C1"), 
+               c("0","1","C1"), 
+               c("0","0","C0")
+                ) %>% as.data.frame()
+colnames(data) <- c("X1","X2","Classs")
+
+results <- NULL
+for( i in c(1:9,(1:10)*10) ){
+  for(replicate in 1:200){
+    rf.model <- randomForest( Classs ~ ., data = data, ntree=i, keep.inbag = TRUE) 
+    pred.rf <- predict(rf.model, data,type="class")
+    err <- (length(which(pred.rf == data$Classs))/length(data$Classs))
+    results <- rbind(results, c(i, err))
+  }
+}
+colnames(results) <- c("num_trees","accuracy")
+results <- as.data.frame(results) %>% mutate(num_trees=as.character(num_trees))
+levels( results$num_trees ) <- unique( results$num_trees  )
+results$num_trees <- factor( results$num_trees , unique( results$num_trees  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = accuracy, x = num_trees)) +
+  geom_point(size=3) 
+
+```
+
+We apply both decision tree (rpart) and random forests to the re-admission data set. Half of the data stes are used for training and the other half for testing. This is run for 20 times, and the box plots of the errors from decision tree and random forests are plotted. Clearly the error rates of decision tree are higher than random forests. 
+```{r}
+library(rpart)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(randomForest)
+library(RCurl)
+set.seed(1)
+
+theme_set(theme_gray(base_size = 15) ) 
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+target_indx <- which( colnames(data) == "DX_bl" )
+data[,target_indx] <- as.factor(paste0("c", data[,target_indx]))
+rm_indx <-  which( colnames(data) %in% c("ID","TOTAL13","MMSCORE") )
+data <- data[,-rm_indx]
+
+err.tree <- NULL
+err.rf <- NULL
+for(i in 1:20){
+    train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+    tree <- rpart( DX_bl ~ ., data = data[train.ix,] ) 
+    pred.test <- predict(tree, data[-train.ix,],type="class")
+    err.tree <- c(err.tree, length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) )
+    
+    rf <- randomForest( DX_bl ~ ., data = data[train.ix,] ) 
+    pred.test <- predict(rf, data[-train.ix,],type="class")
+    err.rf <- c(err.rf, length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) )
+}
+err.tree <- data.frame( err = err.tree , method = "tree" )
+err.rf <- data.frame( err = err.rf , method = "random_forests" )
+
+ggplot() +
+  geom_boxplot(data = rbind(err.tree,err.rf), aes(y = err, x = method)) +
+  geom_point(size=3) 
+
+```
+
+Now we investigate the impact of number of trees, and number of features on the accuracy performance of random forests. First consider the number of trees. For each number of trees, 20 runs are conducated, and the box plots for each setting are shown below. It can be seen, when the number of trees is small, particularly less than 10, the improment is substantial with additional trees added. However, the error rate is stable after the number of trees reaches 100. 
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+require(randomForest)
+set.seed(1)
+
+theme_set(theme_gray(base_size = 15) ) 
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+target_indx <- which( colnames(data) == "DX_bl" )
+data[,target_indx] <- as.factor(paste0("c", data[,target_indx]))
+rm_indx <-  which( colnames(data) %in% c("ID","TOTAL13","MMSCORE") )
+data <- data[,-rm_indx]
+
+results <- NULL
+for( itree in c(1:9, 10, 20, 50, 100, 200, 300, 400, 500, 600, 700)  ){
+  for(i in 1:20){
+      train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+      rf <- randomForest( DX_bl ~ ., ntree = itree, data = data[train.ix,] ) 
+      pred.test <- predict(rf, data[-train.ix,],type="class")
+      this.err <-  length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) 
+      results <- rbind( results, c(itree, this.err)  )
+      # err.rf <- c(err.rf, length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) )
+  }
+}
+
+colnames(results) <- c("num_trees","error")
+results <- as.data.frame(results) %>% mutate(num_trees=as.character(num_trees))
+levels( results$num_trees ) <- unique( results$num_trees  )
+results$num_trees <- factor( results$num_trees , unique( results$num_trees  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = error, x = num_trees)) +
+  geom_point(size=3) 
+
+
+```
+
+Next consider the number of features. 100 trees are used. For each number of features, 20 runs are conducated, and the box plots for each setting are shown below. In this problem, the error rates are not significantly different when the number of features changes.
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+require(randomForest)
+set.seed(1)
+
+theme_set(theme_gray(base_size = 15) ) 
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+target_indx <- which( colnames(data) == "DX_bl" )
+data[,target_indx] <- as.factor(paste0("c", data[,target_indx]))
+rm_indx <-  which( colnames(data) %in% c("ID","TOTAL13","MMSCORE") )
+data <- data[,-rm_indx]
+nFea <- ncol(data) - 1
+results <- NULL
+for( iFeatures in 1:nFea  ){
+  for(i in 1:20){
+      train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+      rf <- randomForest( DX_bl ~ ., mtry = iFeatures, ntree = 100, data = data[train.ix,] ) 
+      pred.test <- predict(rf, data[-train.ix,],type="class")
+      this.err <-  length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) 
+      results <- rbind( results, c(iFeatures, this.err)  )
+      # err.rf <- c(err.rf, length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) )
+  }
+}
+
+colnames(results) <- c("num_features","error")
+results <- as.data.frame(results) %>% mutate(num_features=as.character(num_features))
+levels( results$num_features ) <- unique( results$num_features  )
+results$num_features <- factor( results$num_features , unique( results$num_features  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = error, x = num_features)) +
+  geom_point(size=3) 
+
+```
+
+As mentioned, trees in random forests are fully grown. Here we experiment with the minimum node size, that is, the minimum number of isntances at a node. Again each setting is run 20 times and box plots are shown below. It can be seen, the error rates start to rise at minimum node size euqal to 40, and the error rates when minimum node size less than 40 are not substantially different. More importantly, this shows that a fully-grown tree, that is, minimum node size equal to 1, does not hurt the accuracy performance of random forests. 
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+require(randomForest)
+set.seed(1)
+
+theme_set(theme_gray(base_size = 15) ) 
+
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+target_indx <- which( colnames(data) == "DX_bl" )
+data[,target_indx] <- as.factor(paste0("c", data[,target_indx]))
+rm_indx <-  which( colnames(data) %in% c("ID","TOTAL13","MMSCORE") )
+data <- data[,-rm_indx]
+
+results <- NULL
+for( inodesize in c(1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100)  ){
+  for(i in 1:20){
+      train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+      rf <- randomForest( DX_bl ~ ., ntree = 100, nodesize = inodesize, data = data[train.ix,] ) 
+      pred.test <- predict(rf, data[-train.ix,],type="class")
+      this.err <-  length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) 
+      results <- rbind( results, c(inodesize, this.err)  )
+      # err.rf <- c(err.rf, length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) )
+  }
+}
+
+colnames(results) <- c("min_node_size","error")
+results <- as.data.frame(results) %>% mutate(min_node_size=as.character(min_node_size))
+levels( results$min_node_size ) <- unique( results$min_node_size  )
+results$min_node_size <- factor( results$min_node_size , unique( results$min_node_size  )  )
+ggplot() +
+  geom_boxplot(data = results, aes(y = error, x = min_node_size)) +
+  geom_point(size=3) 
+```
+
+```{r}
+comb = function(n, x) {
+  return(factorial(n) / (factorial(x) * factorial(n-x)))
+}
+comb(100,60)
+
+prob <- function(n,k,p){
+  return( comb(n,k) * p^k * (1-p)^(n-k) )
+}
+
+probSum <- 0
+for(i in 51:100){
+  probSum <- probSum + prob( 100,i,0.6 )
+}
+print(probSum)
+
+probSum <- 0
+for(i in 6:10){
+  probSum <- probSum + prob( 10,i,0.6 )
+}
+print(probSum)
+
+```
+
+
+
+
+
+
+
