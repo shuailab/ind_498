@@ -1,8 +1,8 @@
 ---
 title: 'R-Lab: Decision Trees'
 output:
-  html_document: default
   word_document: default
+  html_document: default
 ---
 
 
@@ -95,7 +95,8 @@ data <- data[,-rm_indx]
 Apply a decision tree to the data and plot the decision tree. 
 ```{r}
 tree <- rpart( DX_bl ~ ., data) 
-rpart.plot(tree,fallen.leaves=FALSE)
+# rpart.plot(tree,fallen.leaves=FALSE,type=0,xcompact=TRUE,compact=TRUE)
+prp(tree,nn.cex=1)
 ```
 The importance score for each variable can be obtained from the tree. HippoNV has the largest importance score among all variables. 
 ```{r}
@@ -105,13 +106,15 @@ print(tree$variable.importance)
 The tree can further pruned with the prune function and parameter cp to control the complexity. cp is the minimum relative error improved by splitting the node. A larger cp leads to a less-complex tree. First we try 0.01, the number of nodes is reduced. 
 ```{r}
 tree_0.05 <- prune(tree,cp=0.05)
-rpart.plot(tree_0.05,fallen.leaves=FALSE)
+# rpart.plot(tree_0.05,fallen.leaves=FALSE)
+prp(tree_0.05,nn.cex=1)
 ```
 
 Then we increase cp to 0.1. The tree only has two nodes.  Here we demonstrate the pruning process by using parameter cp. In practicse, cp can be decided by minimizing the cross-validation error. 
 ```{r}
 tree_0.1 <- prune(tree,cp=0.1)
-rpart.plot(tree_0.1,fallen.leaves=FALSE)
+# rpart.plot(tree_0.1,fallen.leaves=FALSE)
+prp(tree_0.1,nn.cex=1)
 ```
 We adjust the minimum node size of decision tree from 200 to 1, so the decision trees' complexity is expected to increase. Half of the data points for training a decision tree, and the other half is used for testing. A training error and testing error can be calculated for each tree structure.  For each tree, the number of leaf nodes is recorded and used for measuring the complexity of the tree. 
 ```{r,cache=FALSE}
@@ -144,6 +147,18 @@ ggplot(data.plot, aes(x=leaf_num, y=error, shape = type, color=type)) + geom_lin
 ```
 
 
+
+```{r}
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
+str(AD)
+AD$ID = c(1:dim(AD)[1])
+str(AD)
+AD_demo <- subset(AD, select=c("MMSCORE", "AGE","PTGENDER","PTEDUCAT"))
+str(AD_demo)
+
+tree <- rpart( MMSCORE ~ ., AD_demo) 
+# rpart.plot(tree,fallen.leaves=FALSE,type=0,xcompact=TRUE,compact=TRUE)
+prp(tree,nn.cex=1)
 
 ```
 
