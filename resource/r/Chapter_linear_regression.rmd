@@ -1,0 +1,260 @@
+---
+title: "Chapter 2"
+author: "shuai"
+date: "August 25, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+####Chapter 2####
+
+```{r}
+#### Example: Alzheimer's Disease
+# filename
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
+str(AD)
+AD$ID = c(1:dim(AD)[1])
+str(AD)
+```
+
+
+```{r}
+# Description of variables
+# ID  ID of the subjects
+# Age Age
+# PTGENDER Gender
+# PTEDUCAT Years of education
+# FDG Average FDG-PET
+# AV45 Average AV45 SUVR
+# HippoNV The normalized hippocampus volume
+# e2_1 Apolipoprotein E4 polymorphism
+# e4_1 Apolipoprotein E4 polymorphism
+# rs3818361 CR1 gene rs3818361 polymorphism
+# rs744373 BIN1 gene rs744373 polymorphism
+# rs11136000 Clusterin CLU gene rs11136000 polymorphism
+# rs610932 MS4A6A gene rs610932 polymorphism
+# rs3851179 PICALM gene rs3851179 polymorphism
+# rs3764650 ABCA7 gene rs3764650 polymorphism
+# rs3865444 CD33 gene rs3865444 polymorphism
+# MMSCORE Mini-mental state examination (outcome variable)
+# TOTAL13 Alzheimer's Disease Assessment Scale (outcome variable)
+```
+
+
+```{r}
+# subset of variables we want in our first model that only uses demographics predictors
+AD_demo <- subset(AD, select=c("MMSCORE", "AGE","PTGENDER","PTEDUCAT","ID"))
+str(AD_demo)
+```
+
+
+
+```{r}
+# ggplot: Plot the scatterplot of the data
+# install.packages("ggplot2")
+library(ggplot2)
+p <- ggplot(AD_demo, aes(x = PTEDUCAT, y = MMSCORE))
+p <- p + geom_point(size=2)
+# p <- p + geom_smooth(method = "auto")
+p <- p + labs(title="MMSE versus PTEDUCAT")
+print(p)
+```
+
+
+
+```{r}
+# install.packages("car")
+library(car)
+# fit a simple linear regression model with only AGE
+lm.AD_demo <- lm(MMSCORE ~ AGE, data = AD_demo)
+# use summary() to get t-tests of parameters (slope, intercept)
+summary(lm.AD_demo)
+
+# fit the multiple linear regression model with more than one predictor
+lm.AD_demo2 <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = AD_demo)
+summary(lm.AD_demo2)
+```
+
+
+```{r}
+# How to detect interaction terms by exploratory data analysis (EDA)
+require(ggplot2)
+p <- ggplot(AD_demo, aes(x = PTEDUCAT, y = MMSCORE))
+p <- p + geom_point(aes(colour=AGE), size=2)
+# p <- p + geom_smooth(method = "auto")
+p <- p + labs(title="MMSE versus PTEDUCAT")
+print(p)
+
+p <- ggplot(AD_demo[which(AD_demo$AGE < 60),], aes(x = PTEDUCAT, y = MMSCORE))
+p <- p + geom_point(size=2)
+p <- p + geom_smooth(method = lm)
+p <- p + labs(title="MMSE versus PTEDUCAT when AGE < 60")
+print(p)
+
+p <- ggplot(AD_demo[which(AD_demo$AGE > 80),], aes(x = PTEDUCAT, y = MMSCORE))
+p <- p + geom_point(size=2)
+p <- p + geom_smooth(method = lm)
+p <- p + labs(title="MMSE versus PTEDUCAT when AGE > 80")
+print(p)
+```
+
+
+```{r}
+# fit the multiple linear regression model with an interaction term: AGE*PTEDUCAT
+lm.AD_demo2 <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT + AGE*PTEDUCAT, data = AD_demo)
+summary(lm.AD_demo2)
+
+# fit the multiple linear regression model with an interaction term: AGE*PTGENDER
+lm.AD_demo3 <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT + AGE*PTGENDER, data = AD_demo)
+summary(lm.AD_demo2)
+```
+
+
+```{r}
+# re-draw the scatterplot for male
+p <- ggplot(AD_demo[which(AD_demo$PTGENDER == 1),], aes(x = AGE, y = MMSCORE))
+p <- p + geom_point(size=2)
+# p <- p + geom_smooth(method = "auto")
+p <- p + labs(title="MMSE versus Age")
+print(p)
+# re-draw the scatterplot for female
+p <- ggplot(AD_demo[which(AD_demo$PTGENDER == 2),], aes(x = AGE, y = MMSCORE))
+p <- p + geom_point(size=2)
+# p <- p + geom_smooth(method = "auto")
+p <- p + labs(title="MMSE versus Age")
+print(p)
+```
+
+
+
+
+```{r}
+# Conduct diagnostics of the model
+# install.packages("ggfortify")
+require("ggfortify")
+autoplot(lm.AD_demo2, which = 1:6, ncol = 3, label.size = 3)
+```
+
+
+
+```{r}
+# fit a full-scale model
+AD_full <- AD[,c(1:16)]
+lm.AD <- lm(MMSCORE ~ ., data = AD_full)
+Anova(lm.AD, type=3)
+summary(lm.AD)
+```
+
+
+
+```{r}
+# Do we need all the variables?
+# remove e2_1, as it is least significant
+lm.AD.reduced <- lm.AD;
+lm.AD.reduced <- update(lm.AD.reduced, ~ . - e2_1); 
+summary(lm.AD.reduced);
+anova(lm.AD.reduced,lm.AD)
+#further remove rs11136000, as it is now the least significant
+lm.AD.reduced <- update(lm.AD.reduced, ~ . - rs11136000); 
+summary(lm.AD.reduced);
+anova(lm.AD.reduced,lm.AD)
+```
+
+
+
+```{r}
+# Automatic model selection
+lm.AD.F <- step(lm.AD, direction="backward", test="F")
+anova(lm.AD.F,lm.AD)
+```
+
+
+
+```{r}
+# Conduct diagnostics of the model
+# install.packages("ggfortify")
+library("ggfortify")
+autoplot(lm.AD.reduced, which = 1:6, ncol = 3, label.size = 3)
+```
+
+
+
+```{r}
+# Evaluate the variable importance by all subsets regression
+# install.packages("leaps")
+library(leaps)
+leaps<-regsubsets(MMSCORE ~ ., data = AD_full,nbest=4)
+# view results 
+summary(leaps)
+# plot a table of models showing variables in each model.
+# models are ordered by the selection statistic.
+plot(leaps,scale="r2")
+```
+
+
+
+```{r}
+# Supplement the model with some visualization of the statistical patterns
+# Scatterplot matrix to visualize the relationship between outcome variable with continuous predictors
+library(ggplot2)
+# install.packages("GGally")
+library(GGally)
+# draw the scatterplots and also empirical shapes of the distributions of the variables
+p <- ggpairs(AD[,c(16,1,3,4,5,6)], upper = list(continuous = "points")
+             , lower = list(continuous = "cor")
+)
+print(p)
+```
+
+
+
+```{r}
+# Boxplot to visualize the relationship between outcome variable with categorical predictors
+library(ggplot2)
+qplot(factor(PTGENDER), MMSCORE, data = AD, 
+      geom=c("boxplot"), fill = factor(PTGENDER))
+qplot(factor(rs3818361), MMSCORE, data = AD, 
+      geom=c("boxplot"), fill = factor(rs3818361))
+qplot(factor(rs11136000), MMSCORE, data = AD, 
+      geom=c("boxplot"), fill = factor(rs11136000))
+qplot(factor(rs744373), MMSCORE, data = AD, 
+      geom=c("boxplot"), fill = factor(rs744373))
+qplot(factor(rs610932), MMSCORE, data = AD, 
+      geom=c("boxplot"), fill = factor(rs610932))
+qplot(factor(rs3865444), MMSCORE, data = AD, 
+      geom=c("boxplot"), fill = factor(rs3865444))
+
+# Histogram to visualize the relationship between outcome variable with categorical predictors
+library(ggplot2)
+qplot(MMSCORE, data = AD, geom = "histogram",
+      fill = factor(PTGENDER))
+qplot(MMSCORE, data = AD, geom = "histogram",
+      fill = factor(rs3818361))
+qplot(MMSCORE, data = AD, geom = "histogram",
+      fill = factor(rs11136000))
+qplot(MMSCORE, data = AD, geom = "histogram",
+      fill = factor(rs744373))
+qplot(MMSCORE, data = AD[,c(10,12,15,16)], geom = "histogram",
+      fill = factor(rs610932))
+qplot(MMSCORE, data = AD[,c(10,12,15,16)], geom = "histogram",
+      fill = factor(rs3865444))
+```
+
+```{r}
+## Simple example of regression with one predictor
+data = data.frame(rbind(c(1,2),c(3,3),c(3,5),c(5,4),c(5,6),c(6,5),c(8,7),c(9,8)))
+colnames(data) = c("Y","X")
+str(data)
+lm.YX <- lm(Y ~ X, data = data)
+summary(lm.YX)
+```
+
+

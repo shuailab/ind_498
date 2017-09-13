@@ -1,0 +1,200 @@
+---
+title: "Chapter 8"
+author: "shuai"
+date: "August 18, 2017"
+output:
+  html_document: default
+  word_document: default
+---
+
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE, warning=FALSE, message=FALSE)
+```
+
+
+```{r}
+# Chapter 8
+#### Dataset of Alzheimer's Disease 
+#### Objective: prediction of diagnosis 
+# filename
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD_hd.csv"))
+str(AD)
+
+# write.csv(AD, file = "ADNI_baseline2.csv")
+# Description of variables
+# RID  ID of the subjects
+# DX_bl Diagnosis (0: normal; 1: patient)
+# MMSCORE Mini-mental state examination (outcome variable)
+# TOTAL13 Alzheimer's Disease Assessment Scale (outcome variable)
+# Age Age
+# PTGENDER Gender
+# PTEDUCAT Years of education
+# e2_1 Apolipoprotein E4 polymorphism
+# e4_1 Apolipoprotein E4 polymorphism
+# rs3818361 CR1 gene rs3818361 polymorphism
+# rs744373 BIN1 gene rs744373 polymorphism
+# rs11136000 Clusterin CLU gene rs11136000 polymorphism
+# rs610932 MS4A6A gene rs610932 polymorphism
+# rs3851179 PICALM gene rs3851179 polymorphism
+# rs3764650 ABCA7 gene rs3764650 polymorphism
+# rs3865444 CD33 gene rs3865444 polymorphism
+# ST101 - ST9SV regional volumn of grey matter by MRI image
+
+## Impute the missing data
+## install.packages("mice")
+# require(mice)
+# AD <- mice(AD,m=5,maxit=50,meth='pmm',seed=500)
+# AD <- na.omit(AD)
+
+```
+
+
+```{r}
+# Supplement the model with some visualization of the statistical patterns
+# Scatterplot matrix to visualize the relationship between outcome variable with continuous predictors
+require(ggplot2)
+# install.packages("GGally")
+require(GGally)
+# draw the scatterplots and also empirical shapes of the distributions of the variables
+tempRank <- sort(abs(cor(AD[,5],AD[,17:329])),decreasing = TRUE, index.return = TRUE)
+p <- ggpairs(AD[,c(5,16+tempRank$ix[1:8])], upper = list(continuous = "points")
+             , lower = list(continuous = "cor")
+)
+print(p)
+```
+
+```{r}
+AD[,17:dim(AD)[2]] <- scale(AD[,17:dim(AD)[2]])
+# Use the glmnet R pacakge to build LASSO model
+#split into training and test sets
+AD$train <- ifelse(runif(nrow(AD))<0.8,1,0)
+#separate training and test sets
+trainset <- AD[AD$train==1,-grep("train",names(AD))]
+testset <- AD[AD$train==0,-grep("train",names(AD))]
+trainX <- as.matrix(trainset[,17:dim(trainset)[2]])
+testX <- as.matrix(testset[,17:dim(testset)[2]])
+trainY <- as.matrix(trainset[,5])
+testY <- as.matrix(testset[,5])
+#build model
+# install.packages("glmnet")
+require(glmnet)
+fit = glmnet(trainX,trainY, nlambda = 100)
+```
+
+```{r}
+plot(fit,label = TRUE)
+print(fit)
+```
+
+```{r}
+# Check out the marginal correlations between the selected variables with the outcome
+idx.var <- which(coef(fit, s = 0.05)!=0)-1
+tempData <-as.numeric(abs(cor(trainY,trainX[,idx.var])))
+qplot(tempData, geom="histogram") 
+```
+
+```{r}
+# Compare with the overview of the correlations between variables with the outcome
+tempData <-as.numeric(abs(cor(trainY,trainX)))
+qplot(tempData, geom="histogram") 
+```
+
+```{r}
+# Predict on the testing data
+predict(fit,newx=testX,s=c(0.1,0.2,0.4))
+```
+
+```{r}
+# Use cross-validation to decide which model is best
+cv.fit = cv.glmnet(trainX,trainY)
+plot(cv.fit)
+```
+
+```{r}
+# To view the selected ??'s and the corresponding coefficients
+cv.fit$lambda.min
+coef(cv.fit, s = "lambda.min")
+predict(cv.fit, newx = testX, s = "lambda.min")
+```
+
+```{r}
+# fit a full-scale model
+trainX.reduced <- data.frame(trainX[,which(coef(cv.fit, s = "lambda.min")!=0)-1])
+tempData <- cbind(trainY,trainX.reduced)
+lm.AD <- lm(trainY ~ ., data = tempData)
+summary(lm.AD)
+```
+
+
+```{r}
+# Do a ridge regression instead
+fit.ridge = glmnet(trainX,trainY, alpha = 0, nlambda = 100)
+print(fit.ridge)
+plot(fit.ridge, xvar = "lambda", label = TRUE)
+```
+
+```{r}
+# Fit a LASSO model for logistic regression
+trainY <- as.matrix(trainset[,2])
+testY <- as.matrix(testset[,2])
+fit = glmnet(trainX,trainY, nlambda = 100, family = "binomial")
+plot(fit,label = TRUE)
+print(fit)
+# Predict on the testing data
+predict(fit,newx=testX, type = "class", s=c(0.1,0.2,0.4))
+```
+
+```{r}
+# Use cross-validation to decide which model is best
+cv.fit = cv.glmnet(trainX,trainY,family = "binomial", type.measure = "class")
+plot(cv.fit)
+# To view the selected ??'s and the corresponding coefficients
+cv.fit$lambda.min
+coef(cv.fit, s = "lambda.min")
+predict(cv.fit, newx = testX, s = "lambda.min")
+```
+
+
+
+
+```{r}
+# Implement principal component analysis on the AD data
+# install.packages("factoextra")
+require(factoextra )
+require(FactoMineR)
+require(ggfortify)
+tempData <- AD[,c(17:dim(AD)[2])]
+# Conduct the PCA analysis
+pca.AD <- PCA(tempData,  graph = FALSE,ncp=10)
+# Examine the contributions of the PCs in explaining the variation in data
+fviz_screeplot(pca.AD, addlabels = TRUE, ylim = c(0, 50))
+# Examine the loadings of the variables in the PCs
+var <- get_pca_var(pca.AD)
+head(var$contrib)
+# Contributions of variables to PC1
+fviz_contrib(pca.AD, choice = "var", axes = 1, top = 20)
+# Contributions of variables to PC2
+fviz_contrib(pca.AD, choice = "var", axes = 2, top = 20)
+fviz_pca_var(pca.AD, col.var="contrib",
+              select.var = list(contrib = 20),
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE # Avoid text overlapping
+             )
+
+# Examine the projection of data points in the new space defined by PCs
+autoplot(prcomp(tempData), data = AD, 
+         colour = "DX_bl",label = TRUE, label.size = 3)
+```
+
+
+```{r}
+# fit a full-scale model
+tempData <- data.frame(cbind(AD[,5],pca.AD$ind$coord))
+names(tempData) <- c("AGE","PC1","PC2","PC3","PC4","PC5","PC6","PC7","PC8","PC9","PC10")
+lm.AD <- lm(AGE ~ ., data = tempData)
+summary(lm.AD)
+lm.AD2 <- lm(AGE ~ PC1+PC2+PC3+PC4+PC5, data = tempData)
+summary(lm.AD2)
+```
