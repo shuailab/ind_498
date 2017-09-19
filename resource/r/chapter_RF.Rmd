@@ -1,8 +1,8 @@
 ---
 title: 'R-Lab: Random Forests'
 output:
-  html_document: default
   word_document: default
+  html_document: default
 ---
 
 
@@ -302,7 +302,30 @@ print(probSum)
 
 ```
 
+In the following we use random forests for clustering. In random forests, a synthetic data set is generated with the same size as the original data set. One can permuate each variable in the original data set to generate the synthetic data set. Then assign one class to the original data, and another class to the synthetic data, and random forests are used to classify the two data sets. Then based on the frequency of a pair of data points existing in the same node, a distance, referred to as the proximity, between the two data points can be calcualted. And clustering algorithms based on data pair distances can be applied to produce the clusters. The advantage using random forests to produce the distances, is that random forests are not sensitive to the unit of a variable and can be applied to both categorical and numerical variables. In the following we generate a data set combined by two normally distributed data sets with different means. The clusters produced from random forests are shown. It can be seen the two clusters are reasonably consistent with the underlying distributions. 
 
+```{r}
+rm(list=ls(all=TRUE))
+library(rpart)
+library(dplyr)
+library(ggplot2)
+library(randomForest)
+library(MASS)
+library(cluster)
+ndata <- 2000
+
+sigma <- matrix(c(1,0,0,1),2,2)
+data1 <- mvrnorm(n = 500, rep(0, 2), sigma)
+data2 <- mvrnorm(n = 500, rep(3, 2), sigma)
+data <- rbind(data1,data2)
+rf <- randomForest(data)
+prox <- rf$proximity
+clusters <- pam(prox, 2)
+data <- as.data.frame(data)
+data$cluster <- as.character(clusters$clustering)
+ggplot(data,aes(x=V1,y=V2,color=cluster))+geom_point() #+labs(title = "Data points")
+
+```
 
 
 
