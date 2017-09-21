@@ -1,8 +1,8 @@
 ---
 title: 'R-Lab: Random Forests OOB Error'
 output:
-  html_document: default
   word_document: default
+  html_document: default
 ---
 
 
@@ -10,72 +10,88 @@ output:
 knitr::opts_chunk$set(fig.path='Figs/', tidy = TRUE, warning=FALSE, message=FALSE)
 ```
 
-We apply random forests to the re-admission data and the out-of-bag (OOB) error can be obtained. Random forests are run 50 times. Separately, we use 63/100 of the data for training random forests and use the rest 37/100 data to get testing error (referred to as the validation error), so the testing instances prportionis similar to the random forests OOB samples. This is repeated 50 times as well. The error rates from both methods are plotted in the boxplots below. It can be seen the average error from both methods are similar, but the OOB error seems to have less variance compared to the validation error. 
+We apply random forests to the re-admission data, with different number of minimum node sizes. The out-of-bag (OOB) error rates are obtained. Separately, we use half of the data for training random forests and use the other half to get the testing error (referred to as the validation error). This is repeated 50 times and we can get a distribution of the validation error. Lastly, we also get the training error by building random forests on the data set and use the same data set for testing. Three types of error rates are plotted in the boxplot below. Note there is only one data point at each node size for OOB error and training error, which are represented as one line instead a range. It can be seen while the OOB error rates are reasonably aligned with the validation error rates, the training error rates are much smaller. 
 
 ```{r}
 library(dplyr)
 library(tidyr)
 library(ggplot2)
-library(randomForest)
-library(RCurl)
+require(randomForest)
 set.seed(1)
 
 theme_set(theme_gray(base_size = 15) ) 
-
+library(RCurl)
 data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
 
 target_indx <- which( colnames(data) == "DX_bl" )
-target <-  paste0("class_",as.character(data[,target_indx]) )
-rm_indx <-  which( colnames(data) %in% c("DX_bl","ID","TOTAL13","MMSCORE") ) 
-X <- data
-X <- X[,-rm_indx]
+data[,target_indx] <- as.factor(paste0("c", data[,target_indx]))
+rm_indx <-  which( colnames(data) %in% c("ID","TOTAL13","MMSCORE") )
+data <- data[,-rm_indx]
 
-err.mat <- NULL
-for(i in 1:50){
-    rf <- randomForest( X, as.factor(target) ) 
-    err.mat <- rbind(err.mat, c("OOB_error", mean(rf$err.rate[,"OOB"]) ) )
-}
-for(i in 1:50){
-    train.ix <- sample(nrow(X),floor( 63 * nrow(X)/100) )
-    rf <- randomForest( X[train.ix,], as.factor(target[train.ix]) ) 
-    pred.test <- predict(rf, X[-train.ix,],type="class")
-    err.mat <- rbind(err.mat, c("validation_error", length(which(pred.test != target[-train.ix]))/length(pred.test) ) )
+para.v <- c(1,50,100,150,200)
+results <- NULL
+
+# OOB error
+for( ipara in para.v ){
+  rf <- randomForest( DX_bl ~ ., nodesize = ipara, data = data )  # nodesize = inodesize
+  results <- rbind(results, c("OOB_Error",ipara, mean(rf$err.rate[,"OOB"]) ) )
 }
 
-err.mat <- as.data.frame(err.mat)
-colnames(err.mat) <- c("error_type","error")
-err.mat$error = as.numeric(as.character(err.mat$error))
-err.mat$error_type <- factor( err.mat$error_type  )
+# Validation error
+for( ipara in para.v  ){
+  for(i in 1:50){
+      train.ix <- sample( nrow(data), floor( nrow(data)/2) )
+      rf <- randomForest( DX_bl ~ ., nodesize = ipara, data = data[train.ix,] ) 
+      pred.test <- predict(rf, data[-train.ix,],type="class")
+      this.err <-  length(which(pred.test != data[-train.ix,]$DX_bl))/length(pred.test) 
+      results <- rbind( results, c("Validation_Error", ipara, this.err)  )
+  }
+}
 
+# Training error
+for( ipara in para.v ){
+  rf <- randomForest( DX_bl ~ ., nodesize = ipara, data = data )  # nodesize = inodesize
+  pred <- predict(rf, data,type="class")
+  this.err <-  length(which(pred!= data$DX_bl))/length(pred) 
+  results <- rbind( results, c("Training_Error", ipara, this.err)  )
+}
+
+colnames(results) <- c("type","min_node_size","error")
+results <- as.data.frame(results)
+results$error = as.numeric(as.character(results$error))
+results$min_node_size <- factor( results$min_node_size , unique( results$min_node_size  )  )
 ggplot() +
-  geom_boxplot(data = err.mat, aes(x = error_type, y = error)) +
+  geom_boxplot(data = results, aes(y = error, x = min_node_size, color = type)) +
   geom_point(size=3) 
+
+
 ```
 
 
-In the previous experiment, the number of trees in random forests is the default of 500. Since we expect when the number of trees is small, 37% of the trees may not have larger errors than using all the trees. Here we re-run the previous experiment, but with number of trees as 50. The OOB errors and validation errors are plotted in the boxplot. As expected, the OOB error is clearly larger than the validation error, due to the fact that only around 37% * 50 trees are used for prediction. 
+Let's also investigate the impact of the number of trees (ntree) on OOB errors. In particular, we compare 50 trees with 500 trees, with the OOB errors plotted in the plot below. As expected, the OOB errors from 50 trees are clearly larger than the errors from 500 trees. This is because fewer trees are used in the random forests with 50 trees. 
 
 ```{r}
-err.mat <- NULL
-for(i in 1:50){
-    rf <- randomForest( X, as.factor(target) , ntree = 50) 
-    err.mat <- rbind(err.mat, c("OOB_error", mean(rf$err.rate[,"OOB"]) ) )
-}
-for(i in 1:50){
-    train.ix <- sample(nrow(X),floor( 63 * nrow(X)/100) )
-    rf <- randomForest( X[train.ix,], as.factor(target[train.ix]), ntree = 50) 
-    pred.test <- predict(rf, X[-train.ix,],type="class")
-    err.mat <- rbind(err.mat, c("validation_error", length(which(pred.test != target[-train.ix]))/length(pred.test) ) )
+
+para.v <- c(1,50,100,150,200)
+results <- NULL
+
+# OOB error with 500 trees
+for( ipara in para.v ){
+  rf <- randomForest( DX_bl ~ ., nodesize = ipara, ntree = 500, data = data )  # nodesize = inodesize
+  results <- rbind(results, c("OOB_Error_500trees",ipara, mean(rf$err.rate[,"OOB"]) ) )
 }
 
-err.mat <- as.data.frame(err.mat)
-colnames(err.mat) <- c("error_type","error")
-err.mat$error = as.numeric(as.character(err.mat$error))
-err.mat$error_type <- factor( err.mat$error_type  )
-
-ggplot() +
-  geom_boxplot(data = err.mat, aes(x = error_type, y = error)) +
-  geom_point(size=3) 
+# OOB error with 50 trees
+for( ipara in para.v ){
+  rf <- randomForest( DX_bl ~ ., nodesize = ipara, ntree= 50, data = data )  # nodesize = inodesize
+  results <- rbind(results, c("OOB_Error_50trees",ipara, mean(rf$err.rate[,"OOB"]) ) )
+}
+colnames(results) <- c("type","min_node_size","error")
+results <- as.data.frame(results)
+results$error = as.numeric(as.character(results$error))
+results$min_node_size <- factor( results$min_node_size , unique( results$min_node_size  )  )
+ggplot(data = results, aes(y = error, x = min_node_size, fill = type)) +
+  geom_bar(stat="identity",position="dodge") 
 
 
 ```
