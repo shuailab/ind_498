@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = TRUE)
 ####Chapter 2####
 
 ```{r}
+install.packages("RCurl")
+library(RCurl)
 #### Example: Alzheimer's Disease
 # filename
 AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
