@@ -1,5 +1,5 @@
 ---
-title: "Essence of R (ROC)"
+title: "Essence of R (PCA)"
 author: "shuai"
 date: "November 6, 2017"
 output: html_document
