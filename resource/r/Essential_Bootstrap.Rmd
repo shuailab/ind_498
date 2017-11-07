@@ -1,5 +1,5 @@
 ---
-title: "Essence of R (LASSO)"
+title: "Essence of R"
 author: "shuai"
 date: "November 6, 2017"
 output: html_document
@@ -64,6 +64,9 @@ CI.bs
 
 
 ```{r}
+# Extension 
+# Application of the above pipeline to another statistical operation - estimation of linear regression coefficients
+
 # Step 1 -> Read data into R workstation
 
 # Step 2 -> Apply the above pipeline to another statistical operation - estimation of linear regression coefficients
