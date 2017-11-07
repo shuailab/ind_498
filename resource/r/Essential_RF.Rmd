@@ -1,0 +1,123 @@
+---
+title: "Essential R code for random forest (RF)"
+author: "shuai"
+date: "November 1, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 5 _ essential pipeline of random forest (RF)
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+# str(data)
+```
+
+```{r}
+# Step 2 -> Data preprocessing
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- data[,2:16]
+Y <- data$DX_bl
+
+# Make sure the outcome variable is legitimate. If it is a continuous variable (regression problem), it should be defined as a "num" variable in R. If it is a binary or a more genernal categorical variable (classification problem), it should be defined as a "factor" variable in R. 
+# Here, we focus on the binary outcome "DX_bl" (two classes: normal, diseases). The following code makes sure the variable "DX_bl" is a "factor".
+Y <- paste0("c", Y) # This line is to "factorize" the variable "DX_bl". It denotes "0" as "c0" and "1" as "c1", to highlight the fact that "DX_bl" is a factor variable, not a numerical variable
+Y <- as.factor(Y) # as.factor is to convert any variable into the format as "factor" variable. 
+
+# Then, we integrate everything into a data frame
+data <- data.frame(X,Y)
+names(data)[16] = c("DX_bl")
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+```
+
+
+```{r}
+# Step 3 -> Use randomForest() function to build a RF model with all predictors
+library(randomForest)
+rf.AD <- randomForest( DX_bl ~ ., data = data.train, ntree = 100, nodesize = 20, mtry = 5) 
+# Three main factors to control the complexity of a random forest model
+# ntree: number of trees (the more trees, more complex of the random forest model)
+# nodesize: minimum sample size of terminal nodes (the larger the sample size in terminal nodes, less complex of the trees, therefore, less complex of the random forest model)
+# mtry: default values are different; for classification (sqrt(p) where p is number of variables in x) and regression (p/3). The larger the mtry value, more likely to get more complex random forest model
+
+rf.AD # (1) rf.AD is an object returned by randomForest. By outputing it, you can see the OOB error and classification errors in each class (remember, this is training error). (2) For instance, rf.AD$err.rate, has three columns, corresponding to OOB error, error on class 1, and error on class 2, respectively. Each row corresponds to a tree. To get the overall OOB error, simply do mean(rf.AD$err.rate[,"OOB"]). (3) rf.AD$importance: gives ranking scores of the variables, the larger the score, the more importance of the model. 
+
+mean(rf.AD$err.rate[,"OOB"])
+     
+
+```
+
+
+```{r}
+# Step 4 -> Predict using your RF model
+y_hat <- predict(rf.AD, data.test,type="class") # a few comments: 1) predict() is a function that you can find in many R pacakges. R package developers tend to agree to write such a function predict(obj, data), where obj is the obj of the created model by that package, and data is the data points you want to predict on. 2) While in many cases this is not needed, sometimes you do need to specify the argument "type". Here, type="class", which means, y_hat are the predicted classes of the testing samples.
+
+```
+
+```{r}
+# Step 5 -> Evaluate the prediction performance of your RF model
+
+# (1) Three main metrics for classification: Accuracy, Sensitivity (1- False Positive), Specificity (1 - False Negative)
+
+library(caret) # confusionMatrix() in the package "caret" is a powerful function to summerize the prediction performance of a classification model, reporting metrics such as Accuracy, Sensitivity (1- False Positive), Specificity (1 - False Negative), to name a few. 
+confusionMatrix(y_hat, data.test$DX_bl)
+
+# (2) ROC curve is another commonly reported metric for classification models
+library(pROC) # pROC has the roc() function that is very useful here
+y_hat <- predict(rf.AD, data.test,type="vote") # In order to draw ROC, we need the intermeidate prediction (before RF model binarize it into binary classification). Thus, by specifying the argument type="vote", we can generate this intermeidate prediction. y_hat now has two columns, one corresponds to the ratio of votes the trees assign to one class, and the other column is the ratio of votes the trees assign to another class.
+plot(roc(data.test$DX_bl, y_hat[,1]),
+     col="green", main="ROC Curve")
+
+```
+
+
+
+```{r}
+# Remark: A model selection step could be inserted between Step 3 and Step 4 shown above.
+# For example, below, we use 10-fold cross-validation to select the best tree size.
+# Note that, we need to specify a list of candidate models (usually from simple to complex), then use 10-fold cross-validation to evaluate each of them. Then we pick up the best model with minimum prediciton error. The complexity of a random forest is mostly determined by the number of trees (argument: ntree), the depth of each tree that is also directly related to the minimum sample size at the leaf nodes (argument: nodesize), the number of features RF will randomly selet to split the nodes (argument: mtry). The number of trees is usually the biggest determinant. Thus, here, we assume that we can go with the other parameters such as the nodesize by default values in the randomforest package. We can evaluate a list of candidate models, e.g., by trying a RF models with ntree = 50, 100, 150, and 200, respectively. Note that, usually RF is with 50~250 trees. 
+
+n_folds = 10 # number of fold (the parameter K as we say, K-fold cross validation)
+N <- dim(data)[1] # the sample size, N, of the dataset
+folds_i <- sample(rep(1:n_folds, length.out = N)) # This randomly creates a labeling vector (1 X N) for the N samples. For example, here, N = 16, and I run this function and it returns the value as 5  4  4 10  6  7  6  8  3  2  1  5  3  9  2  1. That means, the first sample is allocated to the 5th fold, the 2nd and 3rd samples are allocated to the 4th fold, etc. 
+
+
+# Below is the R code to evaluating the 10-fold cross-validation error for the RF model with 200 trees. You can repeat this for other RF models with different number of trees, or different values on mtry or nodesizes. 
+
+cv_acc <- NULL # cv_mse aims to make records of the classification accuracy for each fold
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k) # In each iteration of the 10 iterations, remember, we use one fold of                                      data as the testing data
+  data.train <- data[-test_i, ] # Then, the remaining 9 folds' data form our training data
+  data.test <- data[test_i, ]   # This is the testing data, from the ith fold
+  rf.AD <- randomForest(DX_bl ~ ., data = data.train, ntree = 200)  # Fit the linear model with the training data
+  y_hat <- predict(rf.AD, data.test,type="class")     # Predict on the testing data using the trained model
+  true_y <- data.test$DX_bl                  # get the true y values for the testing data
+  accuracy <- confusionMatrix(y_hat, true_y )
+  cv_acc[k] <- accuracy$overall[1]    # classification accuracy
+}
+mean(cv_acc)
+
+
+```
+
+

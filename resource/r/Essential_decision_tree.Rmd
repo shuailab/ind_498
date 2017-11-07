@@ -1,0 +1,131 @@
+---
+title: "Essence of R (chapter 2: decision tree)"
+author: "shuai"
+date: "November 1, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 2 _ essential pipeline of decision tree
+
+```{r}
+# Key pacakge for decision tree in R: rpart (for building the tree); rpart.plot (for drawing the tree)
+library(rpart)
+library(rpart.plot)
+
+# Step 1 -> Read data into R workstation
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+
+```
+
+```{r}
+# Step 2 -> Data preprocessing
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- data[,2:16]
+Y <- data$DX_bl
+
+# Make sure the outcome variable is legitimate. If it is a continuous variable (regression problem), it should be defined as a "num" variable in R. If it is a binary or a more genernal categorical variable (classification problem), it should be defined as a "factor" variable in R. 
+# Here, we focus on the binary outcome "DX_bl" (two classes: normal, diseases). The following code makes sure the variable "DX_bl" is a "factor".
+Y <- paste0("c", Y) # This line is to "factorize" the variable "DX_bl". It denotes "0" as "c0" and "1" as "c1", to highlight the fact that "DX_bl" is a factor variable, not a numerical variable
+Y <- as.factor(Y) # as.factor is to convert any variable into the format as "factor" variable. 
+
+# Then, we integrate everything into a data frame
+data <- data.frame(X,Y)
+names(data)[16] = c("DX_bl")
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+```
+
+
+```{r}
+
+# Step 3 -> use rpart to build the decision tree. Just like in linear regression model, we throw in all the predictors first, to see what the learned model. Here, we don't have p-values any more to see the significance of the variables. In a decision tree, if a variable doesn't show up in the tree, it is considered not significant. 
+tree <- rpart( DX_bl ~ ., data = data.train) 
+```
+
+```{r}
+# Step 4 -> draw the tree 
+prp(tree,nn.cex=1) # prp() is a very capable function. It has many arguments to specify the details of how the tree should be drew, e.g., should we show the numbers on the lead nodes? how large is the font size? etc. Use help(prp) to see details
+```
+
+```{r}
+# Step 5 -> prune the tree
+# The tree can further pruned with the prune function and parameter cp to control the complexity. cp is the minimum relative error improved by splitting the node. A larger cp leads to a less-complex tree. First we try 0.01, the number of nodes is reduced. 
+tree <- prune(tree,cp=0.03)
+prp(tree,nn.cex=1)
+```
+
+```{r}
+# Step 6 -> Predict using your tree model
+pred.tree <- predict(tree, data.test, type="class") # a few comments: 1) predict() is a function that you can find in many R pacakges. R package developers tend to agree to write such a function predict(obj, data), where obj is the obj of the created model by that package, and data is the data points you want to predict on. 2) While in many cases this is not needed, sometimes you do need to specify the argument "type". Here, type="class" means that, you specify this is a classification problem. 
+# The following line calculates the prediction error rate (a number from 0 to 1) for a binary classification problem
+err.tree <- length(which(pred.tree != data.test$DX_bl))/length(pred.tree) # 1) which(pred.tree != data$DX_bl) identifies the locations of the incorrect predictions; 2)length(any vector) returns the length of that vector; 3) thus, the ratio of incorrect prediction over the total prediction is the prediction error
+print(err.tree)
+
+```
+
+
+```{r}
+# Remark 1
+# We have been focused on classification problems so far, now let's also try rpart for the same regression problem illusrated in the linear regression . Firstly, AGE, PTGENDER and PTEDUCAT are used as the predictor variables. The tree is plotted in the Figure below. The prediction of MMSCORE (a numeric value) is labeled at each leaf node. In the linear model part, it has been shown that the relationship between MMSCORE and PTEDUCAT changes substantially according to different levels of AGE. The decision tree is able to capture the interaction between PTEDUCAT, AGE and MMSCORE.
+
+# Step 1: read data into R
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
+# Step 2: data preprocessing
+X <- AD[,1:15]
+Y <- AD$MMSCORE
+data <- data.frame(X,Y)
+names(data)[16] <- c("MMSCORE")
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+# Step 3: build the tree
+tree_reg <- rpart( MMSCORE ~ ., data.train, method="anova") # for regression problems, use method="anova"
+
+# Step 4: draw the tree
+prp(tree_reg, nn.cex=1)
+
+# Step 5 -> prune the tree
+tree_reg <- prune(tree_reg,cp=0.03)
+prp(tree_reg,nn.cex=1)
+
+# Step 6 -> Predict using your tree model
+pred.tree <- predict(tree_reg, data.test) 
+cor(pred.tree, data.test$MMSCORE) #For regression model, you can use correlation to measure how close your predictions with the true outcome values of the data points 
+
+```
+
+
+```{r}
+# Remark 2
+
+# as any other major function in most R packages, rpart creates and returns an object, that contains multiple aspects of information. You can use names(obj) to see what is inside the obj. E.g., here:
+names(tree) 
+# We can see that, for example, tree$variable.importance, shows the importance of the variables. However, you may notice that, some variables showed in tree$variable.importance are not on the tree visualization. It is because of two reasons, 1) the importance of a variable in a decision tree is evaluated by the loss of accuracy if this variable is removed from the dataset; 2) the default cp value in rpart is 0.01, thus, the tree shown up in prp(tree) has been pruned, while the variable importance score in the tree object still keeps the information from a full tree. 
+
+# The objects created by the major function in most R packages are usually complex, having many intermediate results that are useful for developers who want to build more packages on these existing packages. Thus, while this richness of information provides great flexibility, it also results in some confusions. But, a common agreement is that, the essential information provided by these objects fit our common definitions/presumptions. 
+
+tree$variable.importance
+```
+
+
+
+
+
+
+

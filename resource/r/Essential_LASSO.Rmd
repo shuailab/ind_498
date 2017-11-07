@@ -1,0 +1,144 @@
+---
+title: "Essence of R (LASSO)"
+author: "shuai"
+date: "November 6, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 11 _ essential pipeline of LASSO
+# LASSO is a powerful approach that has been widely used in many high-dimensional datasets for variable selection (as known as feature selection). LASSO was originally developed for linear regression model. Due to its great performance, it has been extended to other regression models such as logistic regression model. Thus, the name, LASSO, becomes blur sometimes when people refer LASSO, they are referring to some variants of LASSO. Many of these LASSO-type methods can be implemented in the R pacakge glmnet. 
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD_hd.csv"))
+str(AD)
+```
+
+```{r}
+# Step 2 -> Data preprocessing
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- AD[,-c(1:4)]
+Y <- AD$MMSCORE
+
+# Make sure the outcome variable is legitimate. If it is a continuous variable (regression problem), it should be defined as a "num" variable in R. If it is a binary or a more genernal categorical variable (classification problem), it should be defined as a "factor" variable in R. 
+ 
+# Then, we integrate everything into a data frame
+data <- data.frame(Y,X)
+names(data)[1] = c("MMSCORE") # names(data) outputs all the names of the variables. Make sure in the data, the variable names are what you think they are. Here, when we put data <- data.frame(Y,X) in the line above, it seems that all the other variables' names are kept except the MMSCORE. Thus, I re-name the variable with its name. 
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)) * 4 / 5 )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+trainX <- as.matrix(data.train[,-1]) # Here, I did more lines of code for data preprocessing. This is because of the data format requirement by the package "glmnet"
+testX <- as.matrix(data.test[,-1])
+trainY <- as.matrix(data.train[,1])
+testY <- as.matrix(data.test[,1])
+
+
+```
+
+
+```{r}
+# Step 3 -> Use glmnet package to conduct LASSO
+# install.packages("glmnet")
+require(glmnet)
+fit = glmnet(trainX,trainY, family=c("gaussian")) # (1) glmnet() is the main function in the pacakge "glmnet". (2) family = "" is the most important argument that tells glmnet what LASSO-type regression you want to use. By default, it is family=c("gaussian"), which corresponds to linear regression which assumes gaussian error in its error term. There are other choices, such as family=c("binomial") which corresponds to logistic regression model. (3) nlambda specifies how many values of lambda you'd like to run. By default it is 100. 
+print(fit$beta) # The fitted sparse regression parameters under different lambda values are stored in fit$beta. 
+```
+
+
+```{r}
+# Step 4 -> Gain a visual understanding of the variable significance 
+plot(fit,label = TRUE) # A nice visualization of the path trajectory of the fitted sparse regression parameters. In other words, it is to display the information stored in fit$beta. Each curve shows how the regression coefficient of a variable changes according to the value of lambda. The figure should be read from right to left - lambda from small to large. Thus, you can see which variables stay in the last to become zero (means that they are probably significant as you need to impose a large lambda to make them zero). The variables which quickly become zero are probably weak or insignificant variables. 
+```
+
+
+```{r}
+# Step 5 -> Use cross-validation to decide which lambda you should use 
+cv.fit = cv.glmnet(trainX,trainY) # (1) The cross-validation has been packaged in glmnet to make its use easier, i.e., since everyone will use it many times, package it, and put the multiple lines of r codes in the backend, only present one line of r code when using it, is a neat approach. (2) Check out the cv.glmnet function - what is the default value of K in cross-validation here?
+plot(cv.fit) # look for the u-shape, and identify the lowest point that corresponds to the best model
+```
+
+
+
+```{r}
+# Step 6 -> To view the selected best model and the corresponding coefficients
+cv.fit$lambda.min # cv.fit$lambda.min is the best lambda value that results in the best model with smallest mean-squared error
+coef(cv.fit, s = "lambda.min") # This extracts the fitted regression parameters of the linear regression model using this lambda value. See how sparse it is. 
+y_hat <- predict(cv.fit, newx = testX, s = "lambda.min") # This is to predict using the best model selected by LASSO
+cor(y_hat, data.test$MMSCORE) #For regression model, you can use correlation to measure how close your predictions with the true outcome values of the data points 
+mse <- mean((y_hat - data.test$MMSCORE)^2) # Another metric is the mean squared error (mse)
+mse
+```
+
+
+
+```{r}
+# Step 7 -> Re-fit the regression model with selected variables by LASSO
+# As LASSO put l1-norm penalty on the regression parameters, even the significant variables are selected, their regression parameters are biased towards smaller values. Thus, there is a suggestion to re-fit the regression model with selected variables by LASSO. Then you will get unbiased estimates of the regression parameters and R-squareds, p-values. 
+var_idx <- which(coef(cv.fit, s = "lambda.min") != 0)
+lm.AD.reduced <- lm(MMSCORE ~ ., data = data.train[,var_idx])
+summary(lm.AD.reduced) # compare the least-squares estimates of the regression parameters with the regression parameters from LASSO
+
+```
+
+
+
+```{r}
+# Remark - use LASSO for logistic regression
+X <- AD[,-c(1:4)]
+Y <- AD$MMSCORE > mean(AD$MMSCORE)
+
+# Make sure the outcome variable is legitimate. If it is a continuous variable (regression problem), it should be defined as a "num" variable in R. If it is a binary or a more genernal categorical variable (classification problem), it should be defined as a "factor" variable in R. 
+ 
+# Then, we integrate everything into a data frame
+data <- data.frame(Y,X)
+names(data)[1] = c("MMSCORE") 
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)) * 4 / 5 )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+trainX <- as.matrix(data.train[,-1]) # Here, I did more lines of code for data preprocessing. This is because of the data format requirement by the package "glmnet"
+testX <- as.matrix(data.test[,-1])
+trainY <- as.matrix(data.train[,1])
+testY <- as.matrix(data.test[,1])
+
+
+# Fit the model
+fit = glmnet(trainX,trainY, nlambda = 100, family = "binomial")
+plot(fit,label = TRUE)
+print(fit)
+
+# Use cross-validation to decide which model is best
+cv.fit = cv.glmnet(trainX,trainY,family = "binomial", type.measure = "class")
+plot(cv.fit)
+# To view the selected variables and the corresponding coefficients
+cv.fit$lambda.min
+coef(cv.fit, s = "lambda.min")
+y_hat <- predict(cv.fit, newx = testX, s = "lambda.min")
+library(pROC) # pROC has the roc() function that is very useful here
+plot(roc(testY, y_hat, smooth = TRUE),
+     col="green", main="ROC Curve")
+```
+
+

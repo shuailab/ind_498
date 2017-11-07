@@ -1,0 +1,101 @@
+---
+title: "Essence of R (LASSO)"
+author: "shuai"
+date: "November 6, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 4 _ essential pipeline of Bootstrap
+
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+# str(AD)
+```
+
+```{r}
+# Step 2 -> Decide on the statistical operation that you want to "Bootstrap" with
+# Here, let's consider distribution parameter estimation due to its simplicity and sufficiency to represent the idea
+require(MASS)
+fit <- fitdistr(AD$HippoNV, densfun="normal")   # fitdistr() is a function from the package "MASS". It can fit a range of distributions, e.g., by using the argument, densfun="normal", we fit a normal distribution.
+fit # The object returned by fitdistr(). fit$estimate[1] stores the mean estimation. fit$estimate[2] stores the std estimation.
+
+```
+
+```{r}
+# Step 3 -> draw R bootstrap replicates to conduct the selected statistical operation
+R <- 1000
+# Initialize the vector to store the bootstrapped estimates
+bs_mean <- rep(NA, R)
+# draw R bootstrap resamples and obtain the estimates
+for (i in 1:R) {
+  resam1 <- sample(AD$HippoNV, length(AD$HippoNV), replace = TRUE) # (1)  AD$HippoNV is the sample we'd like to bootstrap; (2) length(AD$HippoNV) is tell R that we'd like to generate the bootstrapped samples with the sample size of the original data; (3) replace = TRUE means that a data point could be repeatedly selected by our bootstrap procedure
+  fit <- fitdistr(resam1 , densfun="normal")  # resam1 is a bootstrapped dataset. 
+  bs_mean[i] <- fit$estimate[1] # store the bootstrapped estimates of the mean
+}
+```
+
+
+
+```{r}
+# Step 4 -> Summerarize the results and derive the bootstrap confidence interval (CI) of the parameter
+bs_mean.sorted <- sort(bs_mean) # sort the mean estimates to obtain quantiles needed to construct the CIs
+# 0.025th and 0.975th quantile gives equal-tail bootstrap CI
+CI.bs <- c(bs_mean.sorted[round(0.025*R)], bs_mean.sorted[round(0.975*R+1)])
+CI.bs
+```
+
+
+
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+# Step 2 -> Apply the above pipeline to another statistical operation - estimation of linear regression coefficients
+
+tempData <- data.frame(AD$MMSCORE,AD$AGE, AD$PTGENDER, AD$PTEDUCAT)
+names(tempData) <- c("MMSCORE","AGE","PTGENDER","PTEDUCAT")
+N <- dim(tempData)[1] # number of samples (sample size)
+P <- dim(tempData)[2] - 1 # number of predictors; the reason to minus 1 is because in tempData, there is an outcome variable "MMSCORE".
+
+# Step 3 -> draw R bootstrap replicates to conduct the selected statistical operation
+# draw R bootstrap replicates
+R <- 1000
+# Initialize the vector to store the bootstrapped estimates
+bs_lm <- matrix(NA, nrow = R, ncol = P+1) # There are P+1 regression coefficients (counting the intercept here)
+# draw R bootstrap resamples and obtain the estimates
+for (i in 1:R) {
+  resam_ID <- sample(c(1:N), N, replace = TRUE)
+  resam_Data <- tempData[resam_ID,] # The above two lines generate a Bootstrapped dataset with the same sample size as the original dataset, with replacement of data points in resampling
+  bs.lm <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = resam_Data)
+  bs_lm[i,] <- bs.lm$coefficients
+}
+
+# Step 4 -> Summerarize the results and derive the bootstrap confidence interval (CI) of the parameter
+# Here, let's look at the linear regression coefficient of the variable Age first; for other variables, it is the same process
+bs.AGE <- bs_lm[,2]
+# sort the mean estimates of AGE to obtain bootstrap CI
+bs.AGE.sorted <- sort(bs.AGE)
+# 0.025th and 0.975th quantile gives equal-tail bootstrap CI
+CI.bs <- c(bs.AGE.sorted[round(0.025*R)], bs.AGE.sorted[round(0.975*R+1)])
+CI.bs # One run of this code shows that CI.bs of the regression coefficient of AGE is [-0.053997994  0.004755563], which contains 0. Thus, AGE is not significant here. 
+
+
+```
+
+

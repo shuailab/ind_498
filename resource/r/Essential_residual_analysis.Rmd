@@ -1,0 +1,107 @@
+---
+title: "Essence of R (chapter 2: linear regression model)"
+author: "shuai"
+date: "November 1, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 7 _ essential pipeline of residual analysis
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
+str(AD)
+```
+
+```{r}
+# Step 2 -> Data preprocessing 
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- AD[,1:15]
+Y <- AD$MMSCORE
+data <- data.frame(X,Y)
+names(data)[16] <- c("MMSCORE")
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+```
+
+
+```{r}
+# Step 3 -> Build a model. Here, we use linear regression for an example
+lm.AD <- lm(MMSCORE ~ ., data = data.train)
+summary(lm.AD)
+```
+
+
+
+```{r}
+# Step 4 -> Conduct diagnostics of the model
+# install.packages("ggfortify")
+require("ggfortify") # ggfortify is the package to do model diagnosis
+autoplot(lm.AD.reduced, which = 1:6, ncol = 3, label.size = 3)
+# This R function generates six figures:
+# 1) the left figure in the first row, which is the scatterplot of the residuals versus fitted values of the outcome variable, it is supposed to show purely random distributions of the data points. In other words, any pattern that shows non-random characteristics, such as the curved relationship between the residuals and fitted values, and the unusual parallel lines of the data points, indicates deviance from the assumptions such as independence of the observations and constancy/homoscedasticity of the variance of the errors. 
+# 2) The Q-Q plot, as the middle figure in the first row, shows violation of the normality assumption of the error term. And some particularly violating data points such as the data points 282 and 256 are labelled. 
+# 3) The right figure in the first row, is a re-presentation of the figure in 1). As diagnostic figures are opportunistic efforts to identify problems (like doctors to see patients), seeing no problem usually doesn't mean really no problem. Thus, it is helpful to present the same information in multiple scales.
+# 4) The Cook's distance shown in the left figure in the second row, shows the influential data points that have larger than average influence on the parameter estimation. The Cook's distance of a data point is built on the idea of how much change will be induced on the estimated parameters if the data point is deleted. 
+# 5) The leverage of a data point, on the other hand, shows the influence of the data point in another way. Mathematically, the leverage of a data point is (???y ^_i)/(???y_i ), reflecting how sensitive the prediction on the data point by the model is decided by the observed outcome value y_i. In other words, what data point will result in high leverage value? For data points that are surrounded by many close-by data points, their leverages won't be large, since the impact of removal of them will be compensated by other similar data points in the nearby. Thus, we could infer that the data points that sparsely occupy their neighbor areas will have large leverages. These data points could either be outliers that severely derivate from the linear trend represented by the majority of the data points, or could be valuable data points that align with the linear trend but lack neighbor data points, and thus, changes on their observations will generate a large impact on the predictions on the data points nearby their locations. Thus, it is important to note that, a data point that is influential doesn't necessary imply that it is bad. It only suggests that some more in-depth examination of the data point is needed. 
+# 6) Again, the last figure, as the 3) one, is to re-present the information in 4) and 5)
+
+```
+
+
+
+```{r}
+# Remark 1: Simulate a dataset by ourselves, to see what should be the residual plots look like when there is no violation of the basic assumptions such as linearity, gausian error, independence of errors, etc.
+
+x1 <- rnorm(100, 0, 1) # simulate a predictor (x1) with 100 measurements from a normal distribution, while mean = 0 and std = 1. rnorm() is the function to simulate from normal distribution
+x2 <- rnorm(100, 0, 1) # simulate another predictor (x2)
+
+beta1 <- 1 # the regression coefficient of the first predictor = 1
+beta2 <- 1 # the regression coefficient of the second predictor = 1
+
+mu <- beta1 * x1 + beta2 * x2 # with simulated values of x1 and x2, and the coefficients, we can calculate the mean levels of the outcome variable
+
+y <- rnorm(100, mu, 1) # further, simulate the outcome variable. remember, y = f(x) + error. Here, the error term is N(0,1)
+
+lm.XY <- lm(y ~ ., data = data.frame(y,x1,x2)) # Now, let's fit the linear regression model
+summary(lm.XY) 
+
+# Conduct diagnostics of the model
+library("ggfortify")
+autoplot(lm.XY, which = 1:6, ncol = 3, label.size = 3) # compare this with the results from a real-world data analysis
+
+```
+
+
+```{r}
+# Remark 2: Residual analysis for random forest model (and some other models) using the r package plotmo
+
+library(randomForest)
+library(plotmo)
+
+rf.mod <- randomForest(data.frame(x1,x2),y, ntrees =  100)
+
+plotres(rf.mod, which = 3) # residuals versus fitted
+# You can clearly see that, there is a linear trend in the residuals versus fitted. Which means, the random forest model is not sufficient (even with 100 trees) to fit the linear pattern in the data (tree models have the difficult to approximate linear lines!).
+
+plotres(rf.mod, which = 4) # Q-Q plot of the residuals
+```

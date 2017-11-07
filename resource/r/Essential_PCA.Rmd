@@ -1,0 +1,105 @@
+---
+title: "Essence of R (ROC)"
+author: "shuai"
+date: "November 6, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 12 _ essential pipeline of PCA
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD_hd.csv"))
+# str(AD)
+```
+
+```{r}
+# Step 2 -> Data preprocessing
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- AD[,-c(1:16)]
+Y <- AD$MMSCORE
+
+# Make sure the outcome variable is legitimate. If it is a continuous variable (regression problem), it should be defined as a "num" variable in R. If it is a binary or a more genernal categorical variable (classification problem), it should be defined as a "factor" variable in R. 
+ 
+# Then, we integrate everything into a data frame
+data <- data.frame(Y,X)
+names(data)[1] = c("MMSCORE") # names(data) outputs all the names of the variables. Make sure in the data, the variable names are what you think they are. Here, when we put data <- data.frame(Y,X) in the line above, it seems that all the other variables' names are kept except the MMSCORE. Thus, I re-name the variable with its name. 
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)) * 4 / 5 )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+trainX <- as.matrix(data.train[,-1]) # Here, I did more lines of code for data preprocessing. This is because of the data format requirement by the package "FactorMineR"
+testX <- as.matrix(data.test[,-1])
+trainY <- as.matrix(data.train[,1])
+testY <- as.matrix(data.test[,1])
+
+```
+
+
+```{r}
+# Step 3 -> Implement principal component analysis 
+# install.packages("factoextra")
+require(FactoMineR)
+# Conduct the PCA analysis
+pca.AD <- PCA(trainX,  graph = FALSE,ncp=10) # names(pca.AD) will give you the list of variable names in the object pca.AD created by PCA(). For instance, pca.AD$eig records the eigenvalues of all the PCs, also the transformed value into cumulative percentage of variance. pca.AD$var stores the loadings of the variables in each of the PCs.
+```
+
+```{r}
+# Step 4 -> Examine the contributions of the PCs in explaining the variation in data. This is global information
+require(factoextra ) # to use the following functions such as get_pca_var() and fviz_contrib()
+fviz_screeplot(pca.AD, addlabels = TRUE, ylim = c(0, 50))
+```
+
+```{r}
+# Step 5 -> Examine the loadings of the variables in the PCs. This is local information
+var <- get_pca_var(pca.AD) # to get the loadings of the variables in the PCs
+head(var$contrib) # to only show the first 10 rows
+
+# Visualize the contributions of top variables to PC1 using a bar plot
+fviz_contrib(pca.AD, choice = "var", axes = 1, top = 20)
+# Visualize the contributions of top variables to PC2 using a bar plot
+fviz_contrib(pca.AD, choice = "var", axes = 2, top = 20)
+```
+
+
+
+```{r}
+# Step 6 -> use the transformed data in the space spanned by PCs to fit models. e.g., below is to fit a line regression model
+
+# Data pre-processing
+trainX <- pca.AD$ind$coord # Do transformation of the X matrix of training data
+trainX <- data.frame(trainX)
+names(trainX) <- c("PC1","PC2","PC3","PC4","PC5","PC6","PC7","PC8","PC9","PC10")
+testX <- predict(pca.AD , newdata = testX) # Do transformation of the X matrix of testing data
+testX <- data.frame(testX$coord)
+names(testX) <- c("PC1","PC2","PC3","PC4","PC5","PC6","PC7","PC8","PC9","PC10")
+
+tempData <- data.frame(trainY,trainX)
+names(tempData)[1] <- c("MMSCORE")
+lm.AD <- lm(MMSCORE ~ ., data = tempData)
+summary(lm.AD)
+
+y_hat <- predict(lm.AD, testX) 
+cor(y_hat, testY) #For regression model, you can use correlation to measure how close your predictions with the true outcome values of the data points 
+mse <- mean((y_hat - testY)^2) # Another metric is the mean squared error (mse)
+mse
+```
+
+

@@ -1,0 +1,44 @@
+---
+title: "Essence of R"
+author: "shuai"
+date: "November 7, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 8 _ essential pipeline of clustering
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
+str(AD)
+```
+
+```{r}
+# Step 2 -> Data preprocessing 
+# Create your X matrix (clustering is unsupervised, which means, there is no outcome variable that should be concerned in clustering)
+X <- AD[,1:15]
+```
+
+
+```{r}
+# Step 3 -> Conduct clustering
+require(mclust)
+AD.Mclust <- Mclust(X, G=1:9) # (1) Argument G = 1:9 means that we ask the algorithm to try clustering with number of clusters from 1 to 9. For each G value, a BIC can be calculated. Then, the optimal number of cluster is decided to be the one that has lowest BIC value; (2) 
+summary(AD.Mclust,parameters = TRUE) # (1) Mclust use BIC to decide on the optimal number of clusters. When you use summary(AD.Mclust), you will see the BIC values, the clusters and the number of data points included in each of the clusters. (2) AD.Mclust$classification has the cluster labels of the data points, i.e., each data point is assigned with a label (1,2,3,4) that correponds to each of the four clusters. (3) AD.Mclust$parameters$pro are the vector of phi (represent the prior percentage of each cluster); AD.Mclust$parameters$mean are the mean vectors of the clusters (remember each cluster is a different multivariate normal distribution); AD.Mclust$parameters$$variance$sigma are the covariance matrix of the clusters.
+```
+
+

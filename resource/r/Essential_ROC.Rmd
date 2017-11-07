@@ -1,0 +1,85 @@
+---
+title: "Essence of R (ROC)"
+author: "shuai"
+date: "November 6, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset 9 _ essential pipeline of ROC
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+str(data)
+```
+
+```{r}
+# Step 2 -> Data preprocessing
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- data[,2:16]
+Y <- data$DX_bl
+
+# Make sure the outcome variable is legitimate. If it is a continuous variable (regression problem), it should be defined as a "num" variable in R. If it is a binary or a more genernal categorical variable (classification problem), it should be defined as a "factor" variable in R. 
+# Here, we focus on the binary outcome "DX_bl" (two classes: normal, diseases). The following code makes sure the variable "DX_bl" is a "factor".
+Y <- paste0("c", Y) # This line is to "factorize" the variable "DX_bl". It denotes "0" as "c0" and "1" as "c1", to highlight the fact that "DX_bl" is a factor variable, not a numerical variable
+Y <- as.factor(Y) # as.factor is to convert any variable into the format as "factor" variable. 
+
+# Then, we integrate everything into a data frame
+data <- data.frame(X,Y)
+names(data)[16] = c("DX_bl")
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+```
+
+
+```{r}
+# Step 3 -> Built a classification model, e.g., here, use logistic regression model for an example
+logit.AD.full <- glm(DX_bl ~ ., data = data.train, family = "binomial")
+logit.AD.reduced <- step(logit.AD.full, direction="both", trace = 0)  # Reduce model complexity
+summary(logit.AD.reduced)
+```
+
+
+
+```{r}
+# Step 4 -> ROC curve is another commonly reported metric for classification models
+y_hat <- predict(logit.AD.reduced, data.test)
+library(pROC) # pROC has the roc() function that is very useful here
+plot(roc(data.test$DX_bl, y_hat),
+     col="green", main="ROC Curve")
+
+
+# Do it by yourself - generate a ROC with 3 lines of R code
+# Compare this with the result from pROC package
+simple_roc <- function(labels, scores){
+  labels <- labels == labels[1]
+  labels <- labels[order(scores, decreasing=TRUE)]
+  data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
+}
+
+glm_simple_roc <- simple_roc(data.test$DX_bl, y_hat)
+plot(glm_simple_roc[,1],glm_simple_roc[,2],xlab = "Specificity", ylab = "Sensitivity")
+abline(0,1) # This is to add the 45 degree line - any ROC curve has this line to highlight the baseline. Remark: (1) A 45 degree line represents a null classifier that has zero classification capacity (e.g., a random guess model). The better the classifier, the more its ROC curve towards the upperleft corner. (2) This gives birth to the concept, Area Under the Curve (AUC). The more a classifier's ROC curve towards the upperleft corner, the larger its area under the curve. The maximum of AUC a classifier can attain is 1, while the minimum is 0.5 (i.e., ROC curve happens to be the same as the 45 degree line). 
+
+```
+
+
