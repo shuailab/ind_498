@@ -1,7 +1,7 @@
 ---
-title: "Essence of R (chapter 2: linear regression model)"
+title: "Essence of R"
 author: "shuai"
-date: "November 1, 2017"
+date: "November 3, 2017"
 output: html_document
 ---
 
