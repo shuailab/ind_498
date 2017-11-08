@@ -145,20 +145,20 @@ mean(cv_err)
 
 
 ```{r}
-# Step 4 -> After model selection, use ksvm() function to build your final model
+# Step 5 -> After model selection, use ksvm() function to build your final model
 linear.svm <- ksvm(model2, data=data.train, type='C-svc', kernel='vanilladot', C=10) # (1) The argument, kernel='vanilladot', means that we are going to build a linear SVM model; (2) C=10 is the tolerance parameter (similarly as the penalty parameter in LASSO, C in SVM is to balance two objectives - one to maximize margin, another one to reduce errors)
 
 ```
 
 
 ```{r}
-# Step 5 -> Predict using your SVM model
+# Step 6 -> Predict using your SVM model
 y_hat <- predict(linear.svm, data.test) # a few comments: 1) predict() is a function that you can find in many R pacakges. R package developers tend to agree to write such a function predict(obj, data), where obj is the obj of the created model by that package, and data is the data points you want to predict on. 2) While in many cases this is not needed, sometimes you do need to specify the argument "type". We use the default in predict.svm, type = 'response', which means, y_hat are the classification (c0 or c1). 
 
 ```
 
 ```{r}
-# Step 6 -> Evaluate the prediction performance of your SVM model
+# Step 7 -> Evaluate the prediction performance of your SVM model
 
 # (1) Three main metrics for classification: Accuracy, Sensitivity (1- False Positive), Specificity (1 - False Negative)
 
