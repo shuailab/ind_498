@@ -35,11 +35,6 @@ Y <- AD$MMSCORE
 data <- data.frame(X,Y)
 names(data)[16] <- c("MMSCORE")
 
-# Create a training data (half the original data size)
-train.ix <- sample(nrow(data),floor( nrow(data)/2) )
-data.train <- data[train.ix,]
-# Create a testing data (half the original data size)
-data.test <- data[-train.ix,]
 
 ```
 
