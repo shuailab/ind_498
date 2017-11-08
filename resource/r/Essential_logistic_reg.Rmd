@@ -88,11 +88,12 @@ y_hat <- predict(logit.AD.reduced, data.test) # a few comments: 1) predict() is 
 
 # (1) Three main metrics for classification: Accuracy, Sensitivity (1- False Positive), Specificity (1 - False Negative)
 
-y_hat[which(y_hat > 0)] = "c1" # Since y_hat here is the values from the linear equation part of the logistic regression model, by default, we should use 0 as a cut-off value (only by default, not optimal though), i.e., if y_hat < 0, we name it as one class, and if y_hat > 0, it is another class.
-y_hat[which(y_hat < 0)] = "c0"
+y_hat2 < y_hat
+y_hat2[which(y_hat > 0)] = "c1" # Since y_hat here is the values from the linear equation part of the logistic regression model, by default, we should use 0 as a cut-off value (only by default, not optimal though), i.e., if y_hat < 0, we name it as one class, and if y_hat > 0, it is another class.
+y_hat2[which(y_hat < 0)] = "c0"
 
 library(caret) # confusionMatrix() in the package "caret" is a powerful function to summerize the prediction performance of a classification model, reporting metrics such as Accuracy, Sensitivity (1- False Positive), Specificity (1 - False Negative), to name a few. 
-confusionMatrix(y_hat, data.test$DX_bl)
+confusionMatrix(y_hat2, data.test$DX_bl)
 
 # (2) ROC curve is another commonly reported metric for classification models
 library(pROC) # pROC has the roc() function that is very useful here
