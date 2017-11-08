@@ -100,18 +100,6 @@ plot(roc(data.test$DX_bl, y_hat),
      col="green", main="ROC Curve")
 
 
-simple_roc <- function(labels, scores){
-  labels <- labels == labels[1]
-  labels <- labels[order(scores, decreasing=TRUE)]
-  data.frame(TPR=cumsum(labels)/sum(labels), FPR=cumsum(!labels)/sum(!labels), labels)
-}
-
-y_hat <- predict(logit.AD.reduced, data.test)
-
-glm_simple_roc <- simple_roc(data.test$DX_bl, y_hat)
-plot(glm_simple_roc[,1],glm_simple_roc[,2],xlab = "Specificity", ylab = "Sensitivity")
-abline(0,1)
-
 ```
 
 
