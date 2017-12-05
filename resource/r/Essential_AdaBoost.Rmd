@@ -1,0 +1,94 @@
+---
+title: "Essential R code for AdaBoost"
+author: "shuai"
+date: "Dec 1, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset _ essential pipeline of AdaBoost
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+# str(data)
+```
+
+```{r}
+# Step 2 -> Data preprocessing
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- data[,2:16]
+Y <- data$DX_bl
+
+Y <- as.factor(Y)
+
+# Then, we integrate everything into a data frame
+data <- data.frame(X,Y)
+names(data)[16] = c("DX_bl")
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+```
+
+
+```{r}
+# Step 3 -> Use gbm() function to build a model with all predictors
+library(gbm)
+AB.AD <- gbm( DX_bl ~ ., data = data.train, dist="adaboost", interaction.depth = 6, n.tree = 500) 
+# Two main factors to control the complexity of AdaBoost model
+# n.tree: number of trees (the more trees, more complex of the AdaBoost model)
+# interaction.depth: corresponds to the depth of the trees. the larger the interaction.depth, the more complex of the trees
+
+
+AB.AD # (1) AB.AD is an object returned by gbm. By outputing it, you can see the OOB error and classification errors in each class (remember, this is training error). (2) For instance, rf.AD$err.rate, has three columns, corresponding to OOB error, error on class 1, and error on class 2, respectively. Each row corresponds to a tree. To get the overall OOB error, simply do mean(rf.AD$err.rate[,"OOB"]). (3) rf.AD$importance: gives ranking scores of the variables, the larger the score, the more importance of the model. 
+
+     
+
+```
+
+
+```{r}
+# Step 4 -> Predict using your RF model
+y_prob <- predict(AB.AD, data.test,type="response",n.tree = 500) # a few comments: 1) predict() is a function that you can find in many R pacakges. R package developers tend to agree to write such a function predict(obj, data), where obj is the obj of the created model by that package, and data is the data points you want to predict on. 2) While in many cases this is not needed, sometimes you do need to specify the argument "type". Here, in gbm, type must be either 'link' or 'response'. We use type="response", which means, y_hat are the predicted probabilities (a number between 0 and 1) of belonging to class "1".
+
+# If you want to convert the predicted probabilities into binary predictions, below is how you could do so
+y_hat = c() 
+y_hat[y_prob > 0.5] <- 1; 
+y_hat[y_prob <= 0.5] <- 0
+
+```
+
+```{r}
+# Step 5 -> Evaluate the prediction performance of your AdaBoost model
+
+# (1) Three main metrics for classification: Accuracy, Sensitivity (1- False Positive), Specificity (1 - False Negative)
+
+library(caret) # confusionMatrix() in the package "caret" is a powerful function to summerize the prediction performance of a classification model, reporting metrics such as Accuracy, Sensitivity (1- False Positive), Specificity (1 - False Negative), to name a few. 
+confusionMatrix(y_hat, data.test$DX_bl)
+
+# (2) ROC curve is another commonly reported metric for classification models
+library(pROC) # pROC has the roc() function that is very useful here
+# In order to draw ROC, we need the intermeidate prediction (before binary classification). Thus, y_prob, is this intermeidate prediction. 
+plot(roc(data.test$DX_bl, y_prob),
+     col="green", main="ROC Curve")
+
+```
+
+
