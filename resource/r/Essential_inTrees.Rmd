@@ -1,0 +1,114 @@
+---
+title: "Essential R code for inTrees"
+author: "shuai"
+date: "Dec 5, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+####Analytics Class####
+
+## R programming skillset _ essential pipeline of inTrees
+
+```{r}
+# Step 1 -> Read data into R workstation
+
+#### Read data from a CSV file 
+#### Example: Alzheimer's Disease
+# filename
+
+# RCurl is the R package to read csv file using a link
+library(RCurl)
+data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv"))
+# str(data)
+```
+
+```{r}
+# Step 2 -> Data preprocessing
+# Create your X matrix (predictors) and Y vector (outcome variable)
+X <- data[,2:16]
+Y <- data$DX_bl
+
+# Make sure the outcome variable is legitimate. If it is a continuous variable (regression problem), it should be defined as a "num" variable in R. If it is a binary or a more genernal categorical variable (classification problem), it should be defined as a "factor" variable in R. 
+# Here, we focus on the binary outcome "DX_bl" (two classes: normal, diseases). The following code makes sure the variable "DX_bl" is a "factor".
+Y <- paste0("c", Y) # This line is to "factorize" the variable "DX_bl". It denotes "0" as "c0" and "1" as "c1", to highlight the fact that "DX_bl" is a factor variable, not a numerical variable
+Y <- as.factor(Y) # as.factor is to convert any variable into the format as "factor" variable. 
+
+# Then, we integrate everything into a data frame
+data <- data.frame(X,Y)
+names(data)[16] = c("DX_bl")
+
+# Create a training data (half the original data size)
+train.ix <- sample(nrow(data),floor( nrow(data)/2) )
+data.train <- data[train.ix,]
+# Create a testing data (half the original data size)
+data.test <- data[-train.ix,]
+
+```
+
+
+```{r}
+# Step 3 -> Use randomForest() function to build a RF model, to generate all the candidate rules for later use (by LASSO)
+library(randomForest)
+rf.AD <- randomForest( DX_bl ~ ., data = data.train, ntree = 100, nodesize = 20, mtry = 5) 
+# Three main factors to control the complexity of a random forest model
+# ntree: number of trees (the more trees, more complex of the random forest model)
+# nodesize: minimum sample size of terminal nodes (the larger the sample size in terminal nodes, less complex of the trees, therefore, less complex of the random forest model)
+# mtry: default values are different; for classification (sqrt(p) where p is number of variables in x) and regression (p/3). The larger the mtry value, more likely to get more complex random forest model
+
+rf.AD # (1) rf.AD is an object returned by randomForest. By outputing it, you can see the OOB error and classification errors in each class (remember, this is training error). (2) For instance, rf.AD$err.rate, has three columns, corresponding to OOB error, error on class 1, and error on class 2, respectively. Each row corresponds to a tree. To get the overall OOB error, simply do mean(rf.AD$err.rate[,"OOB"]). (3) rf.AD$importance: gives ranking scores of the variables, the larger the score, the more importance of the model. 
+
+mean(rf.AD$err.rate[,"OOB"])
+     
+
+```
+
+
+```{r}
+# Step 4 -> transform rf object to an inTrees' format
+require("inTrees")
+treeList <- RF2List(rf.AD)  # transform rf object to an inTrees' format. Check out, names(treeList), to see what is inside the object treeList. Basically, it records the details of the trees, inherited from rf.AD
+
+
+```
+
+```{r}
+# Step 5 -> Extract the important rules
+
+exec <- extractRules(treeList,data.train[,c(1:15)]) # Extract the rules from treeList. In other words, this is the decomposition of the trees in the rf.AD into rules. Recall the "Z" variables in lecture. 
+```
+
+
+```{r}
+
+# Step 6 -> Associate each rule with the prediction
+rules <- getRuleMetric(exec,data.train[,c(1:15)], data.train$DX_bl)
+print( rules[order(as.numeric(rules[,"len"])),][1:5,]  ) # len: the number of variables in the rule; freq: the percentage of the data points in your data that satisfy the condition of this rule; err: prediction error of this rule
+
+```
+
+```{r}
+# Step 7 -> prune your rules (some rules have too many variables, which are hard to interpret, thus, prune those rules and trim them down by cutting unnecessary variables out of these rules)
+
+rules.pruned <- pruneRule(rules, data.train[,c(1:15)], data.train$DX_bl, maxDecay = 0.005, typeDecay = 2)
+
+```
+
+```{r}
+
+# Step 8 -> select the top rules, that are most accurate (with smallest err) and quite frequent (you don't want to see rules that are rarely satisfied in the dataset, as this indicates that the rules are probably based on a very small portion of the dataset due to overfitting)
+
+rules.selected <- selectRuleRRF(rules.pruned,data.train[,c(1:15)], data.train$DX_bl)
+rules.present <- presentRules(rules.selected,colnames(data.train[,c(1:15)])) 
+print(cbind(ID = 1:nrow(rules.present),rules.present[,c("condition","pred")]) )
+print(cbind(ID = 1:nrow(rules.present),rules.present[,c("len","freq","err")]) )
+
+```
+
+
+
+
