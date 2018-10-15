@@ -34,7 +34,9 @@ AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/m
 require(MASS)
 fit <- fitdistr(AD$HippoNV, densfun="normal")   # fitdistr() is a function from the package "MASS". It can fit a range of distributions, e.g., by using the argument, densfun="normal", we fit a normal distribution.
 fit # The object returned by fitdistr(). fit$estimate[1] stores the mean estimation. fit$estimate[2] stores the std estimation.
-
+# The lower bound and upper bound of the 95% CI
+fit$estimate[1] - 1.96 * fit$sd[2]
+fit$estimate[1] + 1.96 * fit$sd[2]
 ```
 
 ```{r}
