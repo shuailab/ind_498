@@ -78,6 +78,12 @@ names(tempData) <- c("MMSCORE","AGE","PTGENDER","PTEDUCAT")
 N <- dim(tempData)[1] # number of samples (sample size)
 P <- dim(tempData)[2] - 1 # number of predictors; the reason to minus 1 is because in tempData, there is an outcome variable "MMSCORE".
 
+
+# build a linear regression model with three predictors
+lm.AD <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = resam_Data)
+summary(lm.AD)
+# Age is not significant according to the p-value
+
 # Step 3 -> draw R bootstrap replicates to conduct the selected statistical operation
 # draw R bootstrap replicates
 R <- 1000
