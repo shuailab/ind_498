@@ -37,8 +37,10 @@ X <- AD[,1:15]
 ```{r}
 # Step 3 -> Conduct clustering
 require(mclust)
-AD.Mclust <- Mclust(X, G=1:9) # (1) Argument G = 1:9 means that we ask the algorithm to try clustering with number of clusters from 1 to 9. For each G value, a BIC can be calculated. Then, the optimal number of cluster is decided to be the one that has lowest BIC value; (2) 
+require(mclust)
+AD.Mclust <- Mclust(X, G=3) # (1) Argument G = 1:9 means that we ask the algorithm to try clustering with number of clusters from 1 to 9. For each G value, a BIC can be calculated. Then, the optimal number of cluster is decided to be the one that has lowest BIC value; (2) 
 summary(AD.Mclust,parameters = TRUE) # (1) Mclust use BIC to decide on the optimal number of clusters. When you use summary(AD.Mclust), you will see the BIC values, the clusters and the number of data points included in each of the clusters. (2) AD.Mclust$classification has the cluster labels of the data points, i.e., each data point is assigned with a label (1,2,3,4) that correponds to each of the four clusters. (3) AD.Mclust$parameters$pro are the vector of phi (represent the prior percentage of each cluster); AD.Mclust$parameters$mean are the mean vectors of the clusters (remember each cluster is a different multivariate normal distribution); AD.Mclust$parameters$$variance$sigma are the covariance matrix of the clusters.
+AD.Mclust$classification
 ```
 
 
