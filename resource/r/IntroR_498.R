@@ -6,8 +6,10 @@
 ####################################
 #       set working directory
 ####################################
-setwd("C:/Users/shuai/Google Drive/Shuai/Teaching/IND 498/R code") # set working directory in mac or linux
+setwd("C:/Users/Shuai-PC/Google Drive/Shuai/Teaching/IND 498/R code") # set working directory in mac or linux
+setwd("/Users/shuai_imac/Google Drive/Shuai/Teaching/IND 498/R code")
 #setwd("C:/Users/YOURNAME/Desktop/INDE498")   # set working directory in windows
+#setwd("G:/My Drive/Shuai/Teaching/IND 498/R code") # for shuai's office PC
 getwd()                                 # show current working directory
 
 help(getwd) # check help doc
@@ -48,6 +50,8 @@ data(mtcars)
 # or import from external files
 # for csv
 mydata <- read.csv(file = "mtcars.csv", header = TRUE)
+# file.exists("mtcars.csv")
+# mydata <- read.csv(file = "C:/Users/Shuai-PC/Downloads/tmp_lr.csv", header = TRUE)
 
 ####################################
 #       Viewing data
@@ -77,19 +81,6 @@ mydata[1:3,]
 mydata[c(1,2,3),]
 
 
-####################################
-#       R packages
-####################################
-install.packages("ggplot2")             # install ggplot2 package
-library(ggplot2)                        # load package
-require(ggplot2)                        # another way to load package
-
-?ggplot
-
-ggplot(data = mtcars, aes(x = as.factor(gear), y = mpg, fill = as.factor(gear))) + 
-  geom_boxplot() + 
-  xlab("") + ylab("Miles per Gallon") +
-  ggtitle("Miles by Gear Number")
 
 ####################################
 #       class exercise
@@ -126,10 +117,32 @@ summary(mydata$diameter)
 table(mtcars$cyl)
 table(mtcars[,c("cyl", "hp")])
 
+
+
+####################################
+#      Yahoo financial data      
+####################################
+
+install.packages("quantmod")
+require(quantmod)1988
+getSymbols("IBM",src="yahoo")  # help(getSymbols)
+head(IBM)
+names(IBM)
+chartSeries(IBM,type="candle",subset='2010-08-24::2015-09-02')
+
 ####################################
 #      ggplot2, plotting       
 ####################################
-library(ggplot2)
+install.packages("ggplot2")             # install ggplot2 package
+require(ggplot2)                        # load package
+
+?ggplot
+
+ggplot(data = mtcars, aes(x = as.factor(gear), y = mpg, fill = as.factor(gear))) + 
+  geom_boxplot() + 
+  xlab("") + ylab("Miles per Gallon") +
+  ggtitle("Miles by Gear Number")
+
 mydata <- mtcars
 
 # scatter plot
@@ -150,6 +163,8 @@ ggplot(data = mydata, aes(mpg, fill = as.factor(cyl))) +
   geom_histogram(aes(y = ..density..), color = "black", alpha = 0.2) + 
   #geom_density(color = "blue", alpha = 0.5) +
   ggtitle("histogram plot example with ggplot2")
+
+mydata <- pistonrings
 
 # histogram overlaid 
 mydata <- pistonrings
