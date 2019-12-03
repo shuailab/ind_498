@@ -18,8 +18,6 @@ knitr::opts_chunk$set(echo = TRUE)
 # Step 1 -> Read data into R workstation
 
 #### Read data from a CSV file 
-#### Example: Alzheimer's Disease
-# filename
 
 # RCurl is the R package to read csv file using a link
 library(RCurl)
