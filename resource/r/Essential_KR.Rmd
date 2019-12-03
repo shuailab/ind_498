@@ -95,11 +95,11 @@ mean(cv_mse)
 ```{r}
 #Remark: You could use visual inspection to decide what is the best kernel and bandwidth for your kernel regression as well. Sometimes, visual inspection (sounds subjective) is effective, and can look at the global pattern more clearly than automatic cross-validation that relies on one single index (mse or prediction error)
 
-plot(y ~ x, col = "gray", lwd = 2)
-lines(ksmooth(x,y, "normal", bandwidth=2),lwd = 3, col = "darkorange")
-lines(ksmooth(x,y, "normal", bandwidth=10),lwd = 3, col = "dodgerblue4")
-lines(ksmooth(x,y, "normal", bandwidth=30),lwd = 3, col = "forestgreen")
-lines(ksmooth(x,y, "normal", bandwidth=100),lwd = 3, col = "black")
+plot(Y ~ X, col = "gray", lwd = 2)
+lines(ksmooth(X,Y, "normal", bandwidth=2),lwd = 3, col = "darkorange")
+lines(ksmooth(X,Y, "normal", bandwidth=10),lwd = 3, col = "dodgerblue4")
+lines(ksmooth(X,Y, "normal", bandwidth=30),lwd = 3, col = "forestgreen")
+lines(ksmooth(X,Y, "normal", bandwidth=100),lwd = 3, col = "black")
 legend(x = "topright", legend = c("Kernel Reg (bw = 2)", "Kernel Reg (bw = 10)", "Kernel Reg (bw = 30)","Kernel Reg (bw = 100)"), lwd = rep(3, 4), col = c("darkorange", "dodgerblue4", "forestgreen","black"), 
        text.width = 32, cex = 0.85)
 ```
