@@ -17,12 +17,9 @@ knitr::opts_chunk$set(echo = TRUE)
 # Step 1 -> Read data into R workstation
 
 #### Read data from a CSV file 
-#### Example: Alzheimer's Disease
 # filename
 
-# RCurl is the R package to read csv file using a link
-library(RCurl)
-data <- read.csv(text="https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/KR.csv")
+data <- read.csv(file = "KR.csv", header = TRUE)
 # str(data)
 ```
 
