@@ -19,6 +19,7 @@ library(rpart)
 library(rpart.plot)
 
 # Step 1 -> Read data into R workstation
+setwd("C:/Users/shuai/Downloads")
 data <- read.csv(file = "AD.csv", header = TRUE)
 
 ```
