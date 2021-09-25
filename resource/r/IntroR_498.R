@@ -6,8 +6,9 @@
 ####################################
 #       set working directory
 ####################################
-setwd("C:/Users/Shuai-PC/Google Drive/Shuai/Teaching/IND 498/R code") # set working directory in mac or linux
-setwd("/Users/shuai_imac/Google Drive/Shuai/Teaching/IND 498/R code")
+setwd("C:/Users/shuai/Downloads") 
+# setwd("C:/Users/Shuai-PC/Google Drive/Shuai/Teaching/IND 498/R code") # set working directory in mac or linux
+# setwd("/Users/shuai_imac/Google Drive/Shuai/Teaching/IND 498/R code")
 #setwd("C:/Users/YOURNAME/Desktop/INDE498")   # set working directory in windows
 #setwd("G:/My Drive/Shuai/Teaching/IND 498/R code") # for shuai's office PC
 getwd()                                 # show current working directory
