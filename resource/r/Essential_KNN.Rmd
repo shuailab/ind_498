@@ -18,9 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #### Read data from a CSV file 
 
-# RCurl is the R package to read csv file using a link
-library(RCurl)
-data <- read.csv(text="https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/KR.csv")
+data <- read.csv(file = "KR.csv", header = TRUE)
 # str(data)
 ```
 
