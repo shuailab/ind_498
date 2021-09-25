@@ -19,7 +19,7 @@ library(rpart)
 library(rpart.plot)
 
 # Step 1 -> Read data into R workstation
-data <- read.csv(text="https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv")
+data <- read.csv(file = "AD.csv", header = TRUE)
 
 ```
 
