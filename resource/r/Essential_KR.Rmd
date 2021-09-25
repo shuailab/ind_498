@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 #### Read data from a CSV file 
 # filename
-
+setwd("C:/Users/shuai/Downloads")
 data <- read.csv(file = "KR.csv", header = TRUE)
 # str(data)
 ```
