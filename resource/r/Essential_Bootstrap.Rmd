@@ -77,7 +77,7 @@ P <- dim(tempData)[2] - 1 # number of predictors; the reason to minus 1 is becau
 
 
 # build a linear regression model with three predictors
-lm.AD <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = resam_Data)
+lm.AD <- lm(MMSCORE ~ AGE + PTGENDER + PTEDUCAT, data = tempData)
 summary(lm.AD)
 # Age is not significant according to the p-value
 
