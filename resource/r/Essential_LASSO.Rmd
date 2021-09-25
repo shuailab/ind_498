@@ -20,7 +20,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #### Read data from a CSV file 
 #### Example: Alzheimer's Disease
 # filename
-
+setwd("C:/Users/shuai/Downloads")
 AD <- read.csv(file = "AD_hd.csv", header = TRUE)
 str(AD)
 ```
