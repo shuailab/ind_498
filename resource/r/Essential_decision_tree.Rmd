@@ -81,7 +81,7 @@ print(err.tree)
 # We have been focused on classification problems so far, now let's also try rpart for the same regression problem illusrated in the linear regression . Firstly, AGE, PTGENDER and PTEDUCAT are used as the predictor variables. The tree is plotted in the Figure below. The prediction of MMSCORE (a numeric value) is labeled at each leaf node. In the linear model part, it has been shown that the relationship between MMSCORE and PTEDUCAT changes substantially according to different levels of AGE. The decision tree is able to capture the interaction between PTEDUCAT, AGE and MMSCORE.
 
 # Step 1: read data into R
-AD <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD2.csv"))
+AD <- read.csv(file = "AD.csv", header = TRUE)
 # Step 2: data preprocessing
 X <- AD[,1:15]
 Y <- AD$MMSCORE
