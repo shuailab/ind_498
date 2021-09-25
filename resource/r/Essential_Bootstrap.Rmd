@@ -21,9 +21,7 @@ knitr::opts_chunk$set(echo = TRUE)
 #### Example: Alzheimer's Disease
 # filename
 
-# RCurl is the R package to read csv file using a link
-library(RCurl)
-AD <- read.csv(text="https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/AD.csv")
+AD <- read.csv(file = "AD.csv", header = TRUE)
 # str(AD)
 ```
 
