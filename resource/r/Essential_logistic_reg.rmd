@@ -15,7 +15,6 @@ knitr::opts_chunk$set(echo = TRUE)
 # filename
 setwd("C:/Users/shuai/Downloads")
 data <- read.csv(file = "AD.csv", header = TRUE)
-str(data)
 ```
 
 ```{r}
