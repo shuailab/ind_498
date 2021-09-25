@@ -1,7 +1,6 @@
 ---
 title: "Essence of R"
 author: "shuai"
-date: "November 1, 2017"
 output: html_document
 ---
 
@@ -23,7 +22,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # RCurl is the R package to read csv file using a link
 library(RCurl)
-data <- read.csv(text=getURL("https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/KR.csv"))
+data <- read.csv(text="https://raw.githubusercontent.com/shuailab/ind_498/master/resource/data/KR.csv")
 # str(data)
 ```
 
