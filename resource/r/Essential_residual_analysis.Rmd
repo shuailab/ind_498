@@ -21,7 +21,6 @@ knitr::opts_chunk$set(echo = TRUE)
 # filename
 setwd("C:/Users/shuai/Downloads")
 AD <- read.csv(file = "AD2.csv", header = TRUE)
-str(AD)
 ```
 
 ```{r}
@@ -53,7 +52,7 @@ summary(lm.AD)
 # Step 4 -> Conduct diagnostics of the model
 # install.packages("ggfortify")
 require("ggfortify") # ggfortify is the package to do model diagnosis
-autoplot(lm.AD.reduced, which = 1:6, ncol = 3, label.size = 3)
+autoplot(lm.AD, which = 1:6, ncol = 3, label.size = 3)
 # This R function generates six figures:
 # 1) the left figure in the first row, which is the scatterplot of the residuals versus fitted values of the outcome variable, it is supposed to show purely random distributions of the data points. In other words, any pattern that shows non-random characteristics, such as the curved relationship between the residuals and fitted values, and the unusual parallel lines of the data points, indicates deviance from the assumptions such as independence of the observations and constancy/homoscedasticity of the variance of the errors. 
 # 2) The Q-Q plot, as the middle figure in the first row, shows violation of the normality assumption of the error term. And some particularly violating data points such as the data points 282 and 256 are labelled. 
