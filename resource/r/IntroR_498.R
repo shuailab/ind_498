@@ -124,7 +124,7 @@ table(mtcars[,c("cyl", "hp")])
 ####################################
 
 install.packages("quantmod")
-require(quantmod)1988
+require(quantmod)
 getSymbols("IBM",src="yahoo")  # help(getSymbols)
 head(IBM)
 names(IBM)
