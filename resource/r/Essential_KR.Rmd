@@ -46,7 +46,7 @@ data.test <- data[-train.ix,]
 # Use different values of bandwidth
 
 # model1: ksmooth(x,y, kernel = "normal", bandwidth=10)
-# model2: ksmooth(x,y, kernel = "box", bandwidth=10)
+# model2: ksmooth(x,y, kernel = "normal", bandwidth=30)
 
 ```
 
@@ -79,7 +79,7 @@ for (k in 1:n_folds) {
   data.train.cv <- data.train[-test_i, ] # Then, the remaining n_folds-1 folds' data form our training data
   data.test.cv <- data.train[test_i, ]   # This is the testing data, from the ith fold
   require( 'kernlab' )
-  model2 <- ksmooth(data.train.cv$x, data.train.cv$y, kernel = "box", bandwidth = 20, x.points=data.test.cv[,1]) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
+  model2 <- ksmooth(data.train.cv$x, data.train.cv$y, kernel = "normal", bandwidth = 30, x.points=data.test.cv[,1]) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
   y_hat <- model2$y  # Predict on the testing data using the trained model
   true_y <- data.test.cv$y                  # get the true y values for the testing data
   cv_mse[k] <- mean((true_y - y_hat)^2)    # mean((true_y - y_hat)^2): mean squared error (MSE). The small                                              this error, the better your model is
