@@ -75,24 +75,24 @@ for (k in 1:n_folds) {
   test_i <- which(folds_i == k) # In each iteration of the n_folds iterations, remember, we use one fold of                                      data as the testing data
   data.train.cv <- data.train[-test_i, ] # Then, the remaining n_folds-1 folds' data form our training data
   data.test.cv <- data.train[test_i, ]   # This is the testing data, from the ith fold
-  model1 <- knn.reg(train = data.train.cv$x, test = data.frame(data.test.cv$x), y = data.train.cv$y, k = 5) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
-  y_hat <- model1$pred  # Predict on the testing data using the trained model
-  true_y <- data.test.cv$y                  # get the true y values for the testing data
-  cv_mse[k] <- mean((true_y - y_hat)^2)    # mean((true_y - y_hat)^2): mean squared error (MSE). The small                                              this error, the better your model is
-}
-mean(cv_mse)
-
-
-cv_mse <- NULL # cv_mse aims to make records of the prediction error for each fold
-for (k in 1:n_folds) {
-  test_i <- which(folds_i == k) # In each iteration of the n_folds iterations, remember, we use one fold of                                      data as the testing data
-  data.train.cv <- data.train[-test_i, ] # Then, the remaining n_folds-1 folds' data form our training data
-  data.test.cv <- data.train[test_i, ]   # This is the testing data, from the ith fold
-  model2 <- knn.reg(train = data.train.cv$x, test = data.frame(data.test.cv$x), y = data.train.cv$y, k = 20) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
+  model2 <- knn.reg(train = data.train.cv$x, test = data.frame(data.test.cv$x), y = data.train.cv$y, k = 5) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
   y_hat <- model2$pred  # Predict on the testing data using the trained model
   true_y <- data.test.cv$y                  # get the true y values for the testing data
   cv_mse[k] <- mean((true_y - y_hat)^2)    # mean((true_y - y_hat)^2): mean squared error (MSE). The small                                              this error, the better your model is
 }
+mean(cv_mse)
+
+
+cv_mse <- NULL # cv_mse aims to make records of the prediction error for each fold
+for (k in 1:n_folds) {
+  test_i <- which(folds_i == k) # In each iteration of the n_folds iterations, remember, we use one fold of                                      data as the testing data
+  data.train.cv <- data.train[-test_i, ] # Then, the remaining n_folds-1 folds' data form our training data
+  data.test.cv <- data.train[test_i, ]   # This is the testing data, from the ith fold
+  model3 <- knn.reg(train = data.train.cv$x, test = data.frame(data.test.cv$x), y = data.train.cv$y, k = 20) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
+  y_hat <- model3$pred  # Predict on the testing data using the trained model
+  true_y <- data.test.cv$y                  # get the true y values for the testing data
+  cv_mse[k] <- mean((true_y - y_hat)^2)    # mean((true_y - y_hat)^2): mean squared error (MSE). The small                                              this error, the better your model is
+}
 
 mean(cv_mse)
 
@@ -102,8 +102,8 @@ for (k in 1:n_folds) {
   test_i <- which(folds_i == k) # In each iteration of the n_folds iterations, remember, we use one fold of                                      data as the testing data
   data.train.cv <- data.train[-test_i, ] # Then, the remaining n_folds-1 folds' data form our training data
   data.test.cv <- data.train[test_i, ]   # This is the testing data, from the ith fold
-  model1 <- knn.reg(train = data.train.cv$x, test = data.frame(data.test.cv$x), y = data.train.cv$y, k = 50) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
-  y_hat <- model1$pred  # Predict on the testing data using the trained model
+  model4 <- knn.reg(train = data.train.cv$x, test = data.frame(data.test.cv$x), y = data.train.cv$y, k = 50) # (1) Fit the kernel regression model with Gaussian kernel (argument: kernel = "normal") and bandwidth = 0.5; (2) Here, one unique thing about ksmooth is, there is no predict() for it. Rather, it has the argument "x.points=data.test.cv" to specify where you want to predict on 
+  y_hat <- model4$pred  # Predict on the testing data using the trained model
   true_y <- data.test.cv$y                  # get the true y values for the testing data
   cv_mse[k] <- mean((true_y - y_hat)^2)    # mean((true_y - y_hat)^2): mean squared error (MSE). The small                                              this error, the better your model is
 }
