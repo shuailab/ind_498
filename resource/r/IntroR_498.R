@@ -162,7 +162,7 @@ ggplot(data = mydata, aes(x = as.factor(cyl), y = mpg, fill = as.factor(cyl))) +
 # histogram
 ggplot(data = mydata, aes(mpg, fill = as.factor(cyl))) +
   geom_histogram(aes(y = ..density..), color = "black", alpha = 0.2) + 
-  #geom_density(color = "blue", alpha = 0.5) +
+  geom_density(color = "blue", alpha = 0.5) +
   ggtitle("histogram plot example with ggplot2")
 
 mydata <- pistonrings
