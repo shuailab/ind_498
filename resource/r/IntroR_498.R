@@ -155,7 +155,7 @@ ggplot(data = mydata, aes(x = wt, y = mpg, color = as.factor(cyl))) +
 # boxplot
 ggplot(data = mydata, aes(x = as.factor(cyl), y = mpg, fill = as.factor(cyl))) + 
   geom_boxplot() + 
-  #geom_jitter() +
+  geom_jitter() +
   xlab("Number of cylinders") + ylab("Miles/(US) gallon") +
   ggtitle("boxplot plot example with ggplot2")
 
